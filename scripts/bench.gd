@@ -1,7 +1,8 @@
 extends Node
-## Frame-rate benchmark, enabled with:  godot --path . -- --bench [--web] [--low] [--area=1] [--off=...]
+## Frame-rate benchmark, enabled with:  godot --path . -- --bench [--web] [--quality=0|1|2] [--area=1] [--off=...]
 ## --off switches things off to see what they cost: shadows, pcf, lights, particles, occluders,
-## post, viewport (draw at base size and scale up). --web uses the browser build's settings, --low low quality.
+## post, viewport (draw at base size and scale up). --web uses the browser build's settings;
+## --quality 0 is low, 1 medium (the browser's default), 2 high (the desktop default).
 ## Starts the game in an area, waits, counts frames for a few seconds, prints the result and quits.
 
 var main
@@ -20,9 +21,10 @@ func _ready() -> void:
 			area = int(a.substr(7))
 		if a.begins_with("--off="):
 			off = a.substr(6).split(",")
-	if "--low" in OS.get_cmdline_user_args():
-		Game.low_quality = true  # set directly so the benchmark never saves over the player's setting
-		main._apply_quality()
+	Game.save_settings = false
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--quality="):
+			Game.set_quality(int(a.substr(10)))
 	main.hud.title_screen.visible = false
 	main.start_game()
 	if area > 0:

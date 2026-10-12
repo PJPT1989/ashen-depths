@@ -13,6 +13,7 @@ var fight_until := 0.0
 
 
 func _ready() -> void:
+	Game.save_settings = false
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--shots="):
 			shots_dir = a.substr(8)
@@ -38,13 +39,20 @@ func _ready() -> void:
 		[18.5, func():
 			print("AUTOTEST moor fight: level %d, xp %d, gold %d, monsters left %d, drops %d" % [main.player.level, main.player.xp, main.player.gold, main.monsters.size(), main.drops.size()])
 			_shot("moor")],
-		[0.2, func(): Game.set_low_quality(true)],
+		[0.2, func(): Game.set_quality(Game.LOW)],
 		[0.8, func():
 			var pairs := get_tree().get_nodes_in_group("light_pairs")
 			var shadowed := pairs.filter(func(l): return l.shadow_enabled).size()
 			print("AUTOTEST low quality: %d light pairs, %d still shadowed, post %s" % [pairs.size(), shadowed, main.post.shader.resource_path.get_file()])
 			_shot("low_quality")
-			Game.set_low_quality(false)],
+			Game.set_quality(Game.HIGH)],
+		[0.8, func():
+			print("AUTOTEST high quality: scale mode %d, post %s" % [get_tree().root.content_scale_mode, main.post.shader.resource_path.get_file()])
+			_shot("high_quality")
+			Game.set_quality(Game.MEDIUM)],
+		[0.8, func():
+			print("AUTOTEST medium quality: scale mode %d, post %s" % [get_tree().root.content_scale_mode, main.post.shader.resource_path.get_file()])
+			_shot("medium_quality")],
 		[0.5, func():
 			main.hud.toggle_char(true)
 			main.hud.toggle_inv(true)],

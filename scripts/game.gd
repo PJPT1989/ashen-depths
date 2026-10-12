@@ -16,12 +16,21 @@ const RANK_TINTS := [Color(1, 1, 1), Color(0.6, 0.8, 0.35), Color(1, 0.7, 0.3), 
 	Color(1, 0.45, 0.15), Color(0.55, 1, 1)]
 
 var muted := false
-## Low quality, for slow computers: no shadows, one light instead of each shadowed pair, no
-## monster glow lights or normal maps, a cheap finishing pass and no drifting embers. L toggles it; saved in user://settings.cfg.
+## Graphics quality, cycled with L and saved in user://settings.cfg:
+## LOW (slow computers): no shadows, one light instead of each shadowed pair, no monster glow
+##   lights or normal maps, a cheap finishing pass and no drifting embers.
+## MEDIUM: everything lit and shadowed, drawn at the base 1280x800 and scaled up, bloom brightens
+##   in place without blurring. The browser's default.
+## HIGH: drawn at the screen's full resolution with the blurred bloom. The desktop default.
+enum { LOW, MEDIUM, HIGH }
+const QUALITY_NAMES := ["Low", "Medium", "High"]
 signal quality_changed
 const SETTINGS := "user://settings.cfg"
-var low_quality := false
+var quality := HIGH
+var low_quality: bool:
+	get: return quality == LOW
 var quality_chosen := false  # the player picked a setting, so the automatic switch leaves it alone
+var save_settings := true     # off in the smoke test and benchmark, so they never touch the player's file
 var font_display: Font
 var font_body: Font
 var font_bold: Font
@@ -42,9 +51,11 @@ func _ready() -> void:
 	add_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	add_material.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
 	_register_inputs()
+	if OS.has_feature("web") or "--web" in OS.get_cmdline_user_args():
+		quality = MEDIUM
 	var cfg := ConfigFile.new()
-	if cfg.load(SETTINGS) == OK:
-		low_quality = cfg.get_value("video", "low_quality", false)
+	if cfg.load(SETTINGS) == OK and not ("--autotest" in OS.get_cmdline_user_args() or "--bench" in OS.get_cmdline_user_args()):
+		quality = cfg.get_value("video", "quality", quality)
 		quality_chosen = cfg.get_value("video", "chosen", false)
 	_build_sounds()
 	for i in 10:
@@ -122,13 +133,14 @@ func _set_normal(t: CanvasTexture) -> void:
 	t.normal_texture = null if low_quality else load(t.get_meta("normal"))
 
 
-func set_low_quality(on: bool, chosen := true) -> void:
-	low_quality = on
+func set_quality(q: int, chosen := true) -> void:
+	quality = clampi(q, LOW, HIGH)
 	quality_chosen = quality_chosen or chosen
 	var cfg := ConfigFile.new()
-	cfg.set_value("video", "low_quality", low_quality)
+	cfg.set_value("video", "quality", quality)
 	cfg.set_value("video", "chosen", quality_chosen)
-	cfg.save(SETTINGS)
+	if save_settings:
+		cfg.save(SETTINGS)
 	for a in get_tree().get_nodes_in_group("light_pairs"):
 		_apply_quality(a)
 	for l in get_tree().get_nodes_in_group("minor_lights"):

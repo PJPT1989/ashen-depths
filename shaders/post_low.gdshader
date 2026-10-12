@@ -1,4 +1,4 @@
-// Low-quality version of post.gdshader: vignette and the red hurt pulse drawn over the picture,
+// Low quality version of post.gdshader: vignette and the red hurt pulse drawn over the picture,
 // without reading the screen back (no grade, grain or bloom), for slow computers.
 shader_type canvas_item;
 

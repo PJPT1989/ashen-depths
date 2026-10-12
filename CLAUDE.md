@@ -74,10 +74,12 @@ Everything visual is generated from code; there are no hand-made image assets.
 - Data lives in `const` dictionaries/arrays near the top of the script that owns it (`Act.AREAS`,
   item bases and affixes in `items.gd`, monster kinds in `monster.gd`).
 - Most nodes are built in code rather than in `.tscn` files; follow that.
-- The web build (`Main.web`: `OS.has_feature("web")` or `-- --web`) swaps `shaders/post.gdshader` for
-  the cheaper `post_web.gdshader` (no blur) and draws at the base size, scaled up, for speed.
-  `Game.low_quality` (L key, saved in `user://settings.cfg`) drops shadows, light twins, monster lights,
-  normal maps and embers; lights made with `Game.make_light_pair` follow it automatically. Test web-facing changes with `tools/export_web.sh`
+- Graphics quality `Game.quality` (LOW, MEDIUM, HIGH; L cycles it, saved in `user://settings.cfg`,
+  applied in `Main._apply_quality`). HIGH: full resolution, `post.gdshader` (`post_bloom_web.gdshader`
+  in the browser, which has no screen mipmaps). MEDIUM (the browser's default): base 1280x800 scaled up,
+  `post_medium.gdshader`. LOW: also drops shadows, light twins, monster lights, normal maps and embers,
+  `post_low.gdshader`; lights made with `Game.make_light_pair` follow it automatically. The web build
+  (`Main.web`: `OS.has_feature("web")` or `-- --web`) drops to LOW once by itself if play starts slow. Test web-facing changes with `tools/export_web.sh`
   and a headless Chromium load (Playwright is preinstalled in cloud sessions).
 
 ## Known gaps and ideas Petr was offered

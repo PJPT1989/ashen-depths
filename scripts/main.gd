@@ -61,8 +61,8 @@ var area_state: Array = []    # per area: visited, waypoint, killed {uid: true},
 var tp = null                 # the open town portal: {"area": i, "wpos": Vector2}
 var stock := {"vendor": [], "healer": []}
 var bosses_killed := 0
-## The browser build (or `-- --web` on desktop, to test it) trades a little sharpness for speed:
-## it draws the game at its base size and scales it up, and skips the bloom.
+## The browser build (or `-- --web` on desktop, to test it): starts at medium quality, uses the
+## mipmap-free bloom at high, and drops to low by itself if the first seconds run slowly.
 var web := OS.has_feature("web") or "--web" in OS.get_cmdline_user_args()
 
 
@@ -72,8 +72,6 @@ func _ready() -> void:
 	flat = Node2D.new()
 	add_child(flat)
 	move_child(flat, floor_fx.get_index() + 1)
-	if web:
-		get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
 	_build_post()
 	_build_ambient()
 	new_game()
@@ -738,8 +736,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		Game.muted = not Game.muted
 		floater(player.wpos, "Sound off" if Game.muted else "Sound on", Color("bbbbbb"))
 	elif event.is_action_pressed("toggle_quality"):
-		Game.set_low_quality(not Game.low_quality)
-		floater(player.wpos, "Low quality" if Game.low_quality else "Full quality", Color("bbbbbb"))
+		Game.set_quality((Game.quality + 2) % 3)  # high -> medium -> low -> high
+		floater(player.wpos, "%s quality" % Game.QUALITY_NAMES[Game.quality], Color("bbbbbb"))
 	elif event.is_action_pressed("close"):
 		hud.close_panels()
 
@@ -873,8 +871,8 @@ func _check_speed(dt: float) -> void:
 	var fps: float = fps_check[1] / (fps_check[0] - 3.0)
 	fps_check[0] = -1.0
 	if fps < 24.0:
-		Game.set_low_quality(true, false)
-		show_msg("Low quality", "The game was running slowly, so shadows and effects are off. Press L to switch back.", 6.0)
+		Game.set_quality(Game.LOW, false)
+		show_msg("Low quality", "The game was running slowly, so shadows and effects are off. Press L to change it.", 6.0)
 
 
 ## Push overlapping monsters apart, and off the hero.
@@ -936,12 +934,15 @@ func _build_post() -> void:
 	Game.quality_changed.connect(_apply_quality)
 
 
-## Picks the finishing pass and the ambient particles for the current quality.
+## Picks the resolution, finishing pass and ambient particles for the current quality.
 func _apply_quality() -> void:
-	if Game.low_quality:
-		post.shader = load("res://shaders/post_low.gdshader")
-	else:
-		post.shader = load("res://shaders/post_web.gdshader" if web else "res://shaders/post.gdshader")
+	# below high, draw at the base size and scale up: far fewer pixels on big or sharp screens
+	get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS if Game.quality == Game.HIGH \
+		else Window.CONTENT_SCALE_MODE_VIEWPORT
+	match Game.quality:
+		Game.LOW: post.shader = load("res://shaders/post_low.gdshader")
+		Game.MEDIUM: post.shader = load("res://shaders/post_medium.gdshader")
+		_: post.shader = load("res://shaders/post_bloom_web.gdshader" if web else "res://shaders/post.gdshader")
 	for p in ambient:
 		p.visible = not Game.low_quality
 		p.emitting = not Game.low_quality

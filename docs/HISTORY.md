@@ -132,3 +132,14 @@ faster in open areas and 45% in dungeons on top of round 8. Also turned off SDF 
 light occluders (unused) and drew small prop polygons with `draw_primitive`. Tried the same for
 textured floor and wall tiles, but in Godot 4.3's compatibility renderer lit `draw_primitive` and
 `draw_mesh` broke the normal-mapped lighting, so those stay `draw_polygon`.
+
+## 10. Low, Medium and High quality (2026-10-12)
+> I want to have viable options even for people with faster set up. Can we put there options so
+> that if someone can afford better visuals they can run it like that?
+
+The switch became three levels, cycled with L or the title screen button and remembered: **High**
+(full resolution and the blurred bloom, the desktop default; in the browser the bloom is
+`post_bloom_web.gdshader`, the round 6 web shader), **Medium** (round 8's base-size drawing and
+in-place bloom, the browser's default, shader renamed `post_medium.gdshader`) and **Low** (round 9).
+The browser still drops to Low by itself once if the first seconds are slow and nobody chose. The
+smoke test and benchmark (`--quality=0|1|2`) never save the setting.
