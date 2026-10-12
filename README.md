@@ -13,9 +13,9 @@ Magic: The Gathering and its characters belong to Wizards of the Coast.
 | --- | --- |
 | Left click | Walk, talk, use waypoints and doorways, pick up (hold to keep walking). On a monster: your left-click skill |
 | Right click | Your right-click skill, at the cursor |
-| 1 · 2 · 3 · 4 | The skills on those keys |
+| 1 · 2 · 3 · 4 | Put the skill on that key on the right mouse button. Over a skill in the tree or picker: put it on that key |
 | Q · W | Drink a healing or mana draught from the belt |
-| S | Skills panel: which skill sits on each slot, its rune, your passives |
+| S | Skill tree: spend skill points (click the left or right skill button to choose what it uses) |
 | C · I · Tab | Character panel, inventory, automap |
 | T | Open a town portal |
 | M · Esc | Sound, close panels |
@@ -68,33 +68,41 @@ Magic: The Gathering and its characters belong to Wizards of the Coast.
 ## The planeswalkers
 | Hero | Plays like | Str / Dex / Vit / Ene | Life per Vitality | Resource |
 | --- | --- | --- | --- | --- |
-| Ajani Goldmane | Barbarian: melee, tough | 30 / 20 / 25 / 10 | 4 | **Ferocity** (100): builds when he hits, fades out of combat |
-| Chandra Nalaar | Sorceress: fragile, big spells | 10 / 25 / 10 / 35 | 2 | **Mana**: refills fast |
-| Liliana Vess | Necromancer: minions, curses, corpses | 15 / 25 / 15 / 25 | 2 | **Soul**: gathered by her rites, slowly on its own |
+| Ajani Goldmane | Barbarian: melee, tough | 30 / 20 / 25 / 10 | 4 | Mana (little of it) |
+| Chandra Nalaar | Sorceress: fragile, big spells | 10 / 25 / 10 / 35 | 2 | Mana (most of it) |
+| Liliana Vess | Necromancer: minions, curses, corpses | 15 / 25 / 15 / 25 | 2 | Mana |
 
-Attributes, life and mana follow the Diablo II class each hero stands in for. 5 stat points per level.
+Attributes, life and mana follow the Diablo II class each hero stands in for. 5 stat points and 1 skill
+point per level. Every hero uses mana, which fills completely in 30 seconds (faster with Inner Fire).
 Strength adds 1% weapon damage per point; Dexterity adds 5 attack rating per point, 1 defense per 4
 points, and block chance. Chance to hit is Diablo II's: 2 x AR / (AR + defense) x your level / (your
 level + monster level), held between 5% and 95%. Block chance = shield block x (Dexterity - 15) /
 (level x 2), at most 75%. Resistances cap at 75%. Damage Reduced subtracts from physical hits.
 
-## Skills (like Diablo III)
-Each hero has six categories with two skills each, unlocked by level (all by level 16). Every skill has
-three **runes** that unlock later and change how it works. There are no skill points: the six hotbar
-slots (left click, right click, 1-4) take any unlocked skill, chosen with the rune in the skills panel
-(S). A newly learned skill goes onto the first empty slot. Six **passives** per hero fill up to three
-passive slots (opening at levels 4, 10 and 16). Weapon skills deal a percentage of weapon damage and
-can miss; spells deal a percentage of spell damage, which grows with level and +% spell damage items.
+## Skills (like Diablo II)
+Each hero has three skill trees of ten skills. A tree has six rows that open at levels 1, 6, 12, 18, 24
+and 30, and lines show which skills need a point in another first. One skill point per level; a skill
+takes up to 20 points, but no more than your level minus its row's level plus one. Every point makes
+it stronger, and many skills also get more damage per point in related skills (synergies, shown in the
+skill's text). Passive skills work all the time. "+N to All Skills" on gear and Ajani's Crusade raise
+every skill that has a point. Each hero starts with one point in a first skill.
 
-| Hero | Skills by category |
+The left and right mouse buttons each hold one skill (or the plain attack): click the button on the bar
+to choose. Keys 1-4 switch the right-click skill, like the F keys in Diablo II; a newly learned skill
+goes on the right button and the first free key. Weapon skills deal a share of weapon damage and can
+miss; spells deal their own damage, raised by +% spell damage on gear.
+
+| Hero | Trees (row by row) |
 | --- | --- |
-| Ajani | Claw: Savage Swipe, Flurry of Claws · Maul: Crushing Maul, Whirling Mane · Guard: Ajani's Presence, Pride Guardian · Might: Pounce, Overrun · Hunt: Battle Cry, Ajani's Pridemate · Roar: Day of Judgment, Crusade |
-| Chandra | Spark: Shock, Flame Slash · Flame: Fireball, Chain Lightning · Ward: Pyroclasm, Firewalk · Pyromancy: Fireblast, Incinerate · Kindling: Fervor, Fire Elemental · Inferno: Flame Wave, Pyromancer's Ascension |
-| Liliana | Rite: Drain Life, Grasp of Darkness · Torment: Bone Splinters, Death Cloud · Corpse: Grisly Spectacle, Unearth · Reanimation: Raise Dead, Grave Golem · Curse: Agony Warp, Curse of Death's Hold · Blood: Army of the Damned, Sign in Blood |
+| Ajani | **Combat**: Savage Swipe · Twin Claws, Bound · Thundering Blow, Hurled Blades · Steady Claws, Pounce · Flurry of Claws · Whirling Mane, Berserk Rage. **Pride** (passive): Blade, Axe and Hammer Mastery · Pridewarden's Guard, Leonin Vigor · Thick Hide · Pride's Hunger, Fleet Paws · Relentless · Unbowed. **Roars**: Fearsome Roar, Scavenge · Provoke, Ajani's Presence · Battle Cry, Hunter's Eye · Pride's Strength · Thunderous Roar, Grim Totem · Crusade |
+| Chandra | **Fire**: Shock, Inner Fire · Flame Slash · Flamewake, Fireball · Wall of Fire, Fervor · Fireblast · Pyromancer's Gauntlet, Fire Elemental. **Lightning**: Fling, Spark Volley · Static Discharge · Lightning, Storm Nova · Firewalk, Chain Lightning · Mana Barrier, Living Storm · Storm Mastery. **Pyromancy**: Lava Spike, Flame Ward · Pyroclasm · Magma Blast, Searing Aegis · Volcanic Eruption, Rain of Embers · Fiery Mantle · Firebrand, Flame Wave |
+| Liliana | **Reanimation**: Death Mastery, Raise Dead · Grave Golem · Bone Archers, Golem Mastery · Blood Golem · Deathless Host, Bone Golem · Unearth, Flesh Golem. **Bone and Rot**: Drain Life, Bone Splinters, Bone Shroud · Grasp of Darkness, Grisly Spectacle · Death Cloud, Bone Spear · Bone Cage · Pestilence · Soul Reap. **Curses**: Agony Warp · Darkness, Weakness · Torment · Terror, Delirium · Dread, Vampiric Embrace, Lure of the Grave · Death's Hold |
 
-Minions (skeletons, zombies, the golem, the fire elemental, Ajani's war-cat) follow you between areas,
-attack the nearest foe, and monsters next to them strike back. Curses weaken foes, slow them, make
-them take more damage or flee; burns and rot deal damage over time.
+They follow the Diablo II Barbarian, Sorceress and Necromancer trees (Chandra's third tree is fire
+where the Sorceress has cold). Skeletons and archers rise from corpses; one golem at a time; Unearth
+brings back a slain monster. Minions follow you between areas, attack the nearest foe, and monsters
+next to them strike back. Curses weaken foes, blind them, turn their blows back on them, set them on
+each other, or heal you as you hit them; burns and rot deal damage over time.
 
 ## Items
 - Slots: helm, amulet, body armour, weapon, shield, gloves, belt, boots and two rings. The belt sets how
@@ -108,7 +116,7 @@ them take more damage or flee; burns and rot deal damage over time.
 - Normal, magic (one prefix and/or suffix), rare (3 to 5 affixes) and 16 named uniques. About 30 affix
   families with item-level tiers: enhanced damage and defense, attack rating, the four attributes, life,
   mana, resistances, elemental damage, life and mana leech, attack and run speed, block, damage
-  reduction, thorns, regeneration, magic and gold find.
+  reduction, thorns, regeneration, magic and gold find, +% spell damage and +1 or +2 to all skills.
 - Every item has a seed, so its inventory picture varies: blade and guard shape, pommel, gems, rivets,
   trims, shoulder guards and colour. Worn gear also changes the hero: helm, armour (light, medium or
   heavy), gloves, belt, boots, shield and weapon are separate layers, tinted by the item.
@@ -123,7 +131,7 @@ them take more damage or flee; burns and rot deal damage over time.
 | `scripts/main.gd` | The run: area loading and travel, spawning, loot, trading, input |
 | `scripts/interactable.gd` | Waypoints, gates, cave mouths, doors, stairs, town portals and townsfolk |
 | `scripts/player.gd` | The three heroes: attributes, equipment, inventory grid, combat, running skills |
-| `scripts/skills.gd` | Every skill, rune and passive as data, resources, hotbar defaults |
+| `scripts/skills.gd` | Every skill of the three skill trees as data, with how it grows per point |
 | `scripts/minion.gd`, `skill_fx.gd` | Creatures that fight for the hero; lightning, beams, meteors and clouds |
 | `scripts/monster.gd` | The 15 monster kinds, ranks, uniques, bosses and AI |
 | `scripts/projectile.gd` | Hero and minion missiles; monster hexes, arrows, quills and bile |
@@ -148,7 +156,8 @@ python3 tools/gen_textures.py
 - `tools/setup_godot.sh` installs Godot 4.3 on Linux and imports the project.
 - `tools/smoke_test.sh` runs `godot --path . -- --autotest --shots=DIR` (under `xvfb-run` when there is
   no display). It shows the hero choice and all three heroes, visits the town, the inventory and trader,
-fights on the moor, casts every skill of every hero with every rune, then visits every area,
+fights on the moor, casts every skill of every hero, checks the skill point rules, shows each skill
+  tree, then visits every area,
   kills the act boss, dies and wakes in town, printing a summary and saving screenshots.
 - `tools/export_web.sh` exports the browser version to `build/web/` (`--threads`: the faster multi-threaded one to `build/web-mt/`, which needs the cross-origin isolation headers in `tools/web/.htaccess`); upload that folder to any HTTPS site
   (see `tools/web/HOW-TO-UPLOAD.txt`).

@@ -61,15 +61,18 @@ Everything visual is generated from code; there are no hand-made image assets.
 - Ground and wall textures: `python3 tools/gen_textures.py` (needs Pillow and numpy).
 
 ## Design rules Petr set (keep them)
-- Diablo II is the reference for feel and rules, Diablo III for the skill system. Never use Blizzard
+- Diablo II is the reference for feel and rules, including the skill system (round 14 replaced the
+  Diablo III one at Petr's request). Never use Blizzard
   names or assets. Since round 13 the theme is Magic: The Gathering: heroes are planeswalkers, monsters
   are MTG creatures, bosses and sub-bosses are MTG legends, skills may use MTG card names. The game will
   have five acts, one per colour; Act I is black (swamp). Wizards' Fan Content Policy needs written
   permission for games, so Petr decides before anything goes live.
 - Heroes (`Player.CLASSES`): Ajani (Barbarian stats), Chandra (Sorceress), Liliana (Necromancer).
-  Skills are data in `scripts/skills.gd`: 6 categories x 2 skills per hero, unlocked by level, 3 runes
-  each, 6 passives for 3 slots, no skill points, six hotbar slots. `Player.use_skill` runs them by
-  `kind`; add a skill by adding data, and a new kind only when no existing one fits.
+  Skills are data in `scripts/skills.gd`, Diablo II style: 3 trees x 10 skills per hero on rows opening
+  at levels 1/6/12/18/24/30, prerequisites, 1 skill point per level, up to 20 per skill, growth per point
+  (`per`) and damage synergies (`syn`), passives, +skills from gear. Everyone uses mana. Left and right
+  mouse skills; keys 1-4 swap the right one. `Player.use_skill` runs them by `kind`; add a skill by
+  adding data, and a new kind only when no existing one fits.
 - Act I is fixed: town, then 8 areas always in the order open, open, dungeon, dungeon, open, open,
   dungeon, dungeon, with fixed names (`scripts/act.gd`). Each area's shape is regenerated from its
   own seed every run. Open areas are wide with landmarks that give them a profile (rocks, buildings,
@@ -105,7 +108,7 @@ Everything visual is generated from code; there are no hand-made image assets.
 
 ## Known gaps and ideas Petr was offered
 - Difficulty has only been tuned by the automated test, not by hand; the act boss has 1,864 life.
-- No save/load, no Acts II-V, no quests. Skill numbers are untuned beyond the smoke test.
+- No save/load, no Acts II-V, no quests, no skill respec. Skill numbers are untuned beyond the smoke test.
 - Monster models were restyled after MTG creatures in round 13 (rats, vampires, Phyrexians, demons,
   beetles, black knights, specters, the angler); Sheoldred still uses the demon model.
 - Models are low-poly; more detail in `tools/models.gd` plus a rebake is the cheap visual upgrade.

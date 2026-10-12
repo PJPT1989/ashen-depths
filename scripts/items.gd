@@ -109,6 +109,7 @@ const PREFIXES := [
 	{"k": "res_all", "s": ["shield", "armor", "amulet", "ring"], "t": [[10, 4, 8, "Shimmering"], [18, 9, 15, "Rainbow"]]},
 	{"k": "spell", "s": ["weapon", "helm", "amulet", "ring"], "t": [[2, 8, 15, "Smoldering"], [9, 16, 25, "Burning"], [17, 26, 40, "Infernal"]]},
 	{"k": "mf", "s": ["helm", "amulet", "ring", "gloves", "boots"], "t": [[4, 5, 10, "Lucky"], [14, 11, 20, "Fortuitous"]]},
+	{"k": "skills", "s": ["amulet", "helm", "weapon"], "t": [[12, 1, 1, "Planeswalker's"], [24, 2, 2, "Archmage's"]]},
 	{"k": "def", "s": ARMORS, "t": [[1, 2, 6, "Hard"], [7, 7, 15, "Reinforced"], [16, 16, 30, "Ironclad"]]},
 ]
 const SUFFIXES := [
@@ -154,7 +155,7 @@ const MOD_TEXT := {
 	"ar": "+%d to Attack Rating", "def": "+%d Defense", "maxd": "+%d to Maximum Damage",
 	"fdmg": "Adds fire damage up to %d", "cdmg": "Adds cold damage up to %d (chills)", "ldmg": "Adds 1-%d lightning damage",
 	"res_fire": "Fire Resist +%d%%", "res_cold": "Cold Resist +%d%%", "res_lit": "Lightning Resist +%d%%",
-	"res_pois": "Poison Resist +%d%%", "res_all": "All Resistances +%d", "spell": "+%d%% Fireball and Frost Nova damage",
+	"res_pois": "Poison Resist +%d%%", "res_all": "All Resistances +%d", "spell": "+%d%% Spell Damage", "skills": "+%d to All Skills",
 	"mf": "%d%% Better Chance of Getting Magic Items", "gold": "%d%% Extra Gold from Monsters",
 	"leech": "%d%% Life stolen per hit", "mleech": "%d%% Mana stolen per hit", "ias": "+%d%% Increased Attack Speed",
 	"frw": "+%d%% Faster Run/Walk", "block": "+%d%% Increased Chance of Blocking", "dr": "Damage Reduced by %d",
@@ -171,7 +172,7 @@ const UNIQUES := [
 	{"n": "Mantle of the Last Lamp", "type": "armor", "base": "Studded Leather", "lvl": 9, "tint": Color(0.75, 0.55, 0.3), "mods": {"edef": 90, "life": 40, "res_fire": 25, "regen": 4}},
 	{"n": "Rimeplate", "type": "armor", "base": "Breast Plate", "lvl": 17, "tint": Color(0.6, 0.8, 0.95), "mods": {"edef": 80, "res_cold": 40, "dr": 6, "str": 10}},
 	{"n": "Gnasher's Skull", "type": "helm", "base": "Skull Cap", "lvl": 6, "tint": Color(0.85, 0.8, 0.65), "mods": {"edef": 50, "leech": 4, "ar": 30, "str": 4}},
-	{"n": "The Hollow Crown", "type": "helm", "base": "Crown", "lvl": 20, "tint": Color(0.7, 0.6, 0.9), "mods": {"edef": 70, "mana": 40, "spell": 25, "ene": 10}},
+	{"n": "The Hollow Crown", "type": "helm", "base": "Crown", "lvl": 20, "tint": Color(0.7, 0.6, 0.9), "mods": {"edef": 70, "mana": 40, "skills": 1, "ene": 10}},
 	{"n": "Grip of Embers", "type": "gloves", "base": "Heavy Gloves", "lvl": 8, "tint": Color(0.9, 0.4, 0.2), "mods": {"edef": 60, "fdmg": 5, "ias": 15, "dex": 6}},
 	{"n": "Rope of the Hanged", "type": "belt", "base": "Light Belt", "lvl": 7, "tint": Color(0.55, 0.5, 0.4), "mods": {"edef": 50, "life": 25, "res_pois": 30, "regen": 2}},
 	{"n": "Mirewalkers", "type": "boots", "base": "Heavy Boots", "lvl": 8, "tint": Color(0.35, 0.45, 0.3), "mods": {"edef": 60, "frw": 30, "res_pois": 25, "dex": 5}},

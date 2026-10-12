@@ -66,6 +66,13 @@ var weak := 0.0             # % less damage dealt, while weak_t lasts
 var weak_t := 0.0
 var vuln := 0.0             # % more damage taken, while vuln_t lasts
 var vuln_t := 0.0
+var blind_t := 0.0          # Darkness: can barely see
+var confuse_t := 0.0        # Delirium: attacks the nearest creature
+var bait_t := 0.0           # Lure of the Grave: the others go for this one
+var reflect := 0.0          # Torment: % of its blows' damage it takes back, while reflect_t lasts
+var reflect_t := 0.0
+var tap := 0.0              # Vampiric Embrace: % of damage done to it heals the hero, while tap_t lasts
+var tap_t := 0.0
 var dot_dps := 0.0          # burning or rotting, while dot_t lasts
 var dot_t := 0.0
 var dot_acc := 0.0
@@ -130,8 +137,23 @@ func dmg_mult() -> float:
 	return 1.0 - weak / 100.0 if weak_t > 0.0 else 1.0
 
 
-## A skill's lingering effects: debuff keys weak, slow, vuln, fear (see Skills).
+## A skill's lingering effects (see Skills): weak, vuln, reflect, tap (%) and slow last dur
+## seconds; fear and stun give their own seconds; blind, confuse and bait last dur seconds.
+## Bosses ignore fear, blinding and confusion, and shrug off most of a stun.
 func afflict(debuff: Dictionary, dur: float) -> void:
+	if debuff.has("reflect"):
+		reflect = maxf(reflect if reflect_t > 0.0 else 0.0, debuff.reflect)
+		reflect_t = maxf(reflect_t, dur)
+	if debuff.has("tap"):
+		tap = maxf(tap if tap_t > 0.0 else 0.0, debuff.tap)
+		tap_t = maxf(tap_t, dur)
+	if debuff.has("bait"):
+		bait_t = maxf(bait_t, dur)
+	if not is_boss:
+		if debuff.has("blind"):
+			blind_t = maxf(blind_t, dur)
+		if debuff.has("confuse"):
+			confuse_t = maxf(confuse_t, dur)
 	if debuff.has("weak"):
 		weak = maxf(weak if weak_t > 0.0 else 0.0, debuff.weak)
 		weak_t = maxf(weak_t, dur)
@@ -210,6 +232,11 @@ func _process(dt: float) -> void:
 	fear = maxf(0.0, fear - dt)
 	weak_t = maxf(0.0, weak_t - dt)
 	vuln_t = maxf(0.0, vuln_t - dt)
+	blind_t = maxf(0.0, blind_t - dt)
+	confuse_t = maxf(0.0, confuse_t - dt)
+	bait_t = maxf(0.0, bait_t - dt)
+	reflect_t = maxf(0.0, reflect_t - dt)
+	tap_t = maxf(0.0, tap_t - dt)
 	cd -= dt * (0.6 if slow > 0.0 else 1.0)
 	moving = false
 	if hit > 0.0:
@@ -218,7 +245,7 @@ func _process(dt: float) -> void:
 		modulate = Color(1.5, 1.4, 0.8)
 	elif slow > 0.0:
 		modulate = Color(0.6, 0.85, 1.5)
-	elif vuln_t > 0.0 or weak_t > 0.0:
+	elif vuln_t > 0.0 or weak_t > 0.0 or reflect_t > 0.0 or tap_t > 0.0 or confuse_t > 0.0 or blind_t > 0.0 or bait_t > 0.0:
 		modulate = Color(1.15, 0.7, 1.35)
 	else:
 		modulate = Color.WHITE
@@ -248,8 +275,12 @@ func _process(dt: float) -> void:
 
 func _think(dt: float, player: Player) -> void:
 	var dist := wpos.distance_to(player.wpos)
+	if confuse_t > 0.0 and _fight_others(dt):
+		return
+	if blind_t > 0.0 and dist > 2.0:
+		aggro = false
 	if not aggro:
-		var sight := 9.0 if dungeon.outdoor else 7.5
+		var sight := (9.0 if dungeon.outdoor else 7.5) if blind_t <= 0.0 else 2.0
 		if dist < sight and dungeon.los(wpos, player.wpos):
 			wake()
 		else:
@@ -310,6 +341,37 @@ func _think(dt: float, player: Player) -> void:
 		moving = follow(spd, dt)
 
 
+## Delirium: go for the nearest other monster (a lured one first) and hit it. False if none is near.
+func _fight_others(dt: float) -> bool:
+	var foe: Monster = null
+	var bd := 6.0
+	for o in main.monsters:
+		if o == self or o.dead:
+			continue
+		var dd: float = o.wpos.distance_to(wpos) - (4.0 if o.bait_t > 0.0 else 0.0)
+		if dd < bd:
+			bd = dd
+			foe = o
+	if foe == null:
+		return false
+	var dist := wpos.distance_to(foe.wpos)
+	var reach: float = d.range if ranged else d.range + foe.radius
+	if dist <= reach:
+		face(foe.wpos - wpos)
+		path.clear()
+		if cd <= 0.0:
+			cd = attack_cd
+			play_action("attack", 0.5)
+			main.damage_monster(foe, roundi(randi_range(dmg[0], dmg[1]) * dmg_mult()), Color("d080ff"))
+	else:
+		repath -= dt
+		if repath <= 0.0 or path.is_empty():
+			path = dungeon.find_path(wpos, foe.wpos, radius)
+			repath = 0.4
+		moving = follow(speed * (0.5 if slow > 0.0 else 1.0), dt)
+	return true
+
+
 ## Wake this monster and the ones around it.
 func wake() -> void:
 	aggro = true
@@ -332,6 +394,8 @@ func _melee(player: Player) -> void:
 		player.take_hit(int(ceil(amount * 0.6)), e, null)
 	else:
 		player.take_hit(amount, e, self)
+	if reflect_t > 0.0 and not dead:
+		main.damage_monster(self, maxi(1, roundi(amount * reflect / 100.0)), Color("c060ff"))
 	if "manaburn" in mods:
 		player.mp = maxf(0.0, player.mp - amount * 1.5)
 

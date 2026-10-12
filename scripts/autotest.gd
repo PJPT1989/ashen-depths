@@ -62,14 +62,23 @@ func _ready() -> void:
 		[1.2, func():
 			_skill_test("liliana")
 			_shot("skills_liliana")],
-		[0.3, func(): _showcase("chandra", ["fireblast", "chain_lightning", "flame_slash"])],
+		[0.3, func(): _showcase("chandra", ["fireblast", "chain_lightning", "wall_of_fire"])],
 		[0.45, func(): _shot("showcase_chandra")],
-		[0.3, func(): _showcase("liliana", ["death_cloud", "army_of_the_damned", "bone_splinters"])],
+		[0.3, func(): _showcase("liliana", ["death_cloud", "bone_golem", "bone_splinters"])],
 		[0.6, func(): _shot("showcase_liliana")],
-		[0.3, func(): _showcase("ajani", ["day_of_judgment"])],
+		[0.3, func(): _showcase("ajani", ["thunderous_roar"])],
 		[0.25, func(): _shot("showcase_ajani")],
-		[1.5, func(): main.hud.toggle_skills(true)],
-		[0.6, func(): _shot("skills_panel")],
+		[1.0, func(): _learn_test()],
+		[0.3, func(): _tree_shot("chandra", 0, "fireball")],
+		[0.6, func(): _shot("tree_chandra")],
+		[0.3, func(): _tree_shot("liliana", 0, "raise_dead")],
+		[0.6, func(): _shot("tree_liliana")],
+		[0.3, func(): _tree_shot("ajani", 2, "battle_cry")],
+		[0.6, func(): _shot("tree_ajani")],
+		[0.3, func():
+			main.hud.close_panels()
+			main.hud.open_picker(1)],
+		[0.5, func(): _shot("skill_picker")],
 		[0.3, func():
 			print("AUTOTEST minions: %d, corpses %d" % [main.minions.size(), main.corpses.size()])
 			main.hud.close_panels()
@@ -149,57 +158,111 @@ func _kill_some(n: int) -> void:
 		main.kill_monster(m)
 
 
-## Every skill of a hero with every rune, cast at the nearest monster; prints what failed.
+## Every skill of a hero at level 10, cast at the nearest monster; prints what failed.
 func _skill_test(hero: String) -> void:
 	var p: Player = main.player
 	p.set_class(hero)
-	p.level = 24
+	p.level = 30
+	for id in Skills.of_hero(hero):
+		p.skills[id] = 10
 	p.recalc()
-	for i in Skills.PASSIVE_SLOTS.size():
-		p.set_passive(i, Skills.passives_of(hero)[i * 2])
 	var ok := 0
 	var tried := 0
 	var failed: Array = []
 	for id in Skills.of_hero(hero):
-		for r in range(-1, 3):
-			var m: Monster = null
-			var bd := INF
-			for o in main.monsters:
-				var dd: float = o.wpos.distance_to(p.wpos)
-				if not o.is_boss and dd < bd:
-					bd = dd
-					m = o
-			if m == null:
-				continue
-			if bd > 1.2:
-				p.wpos = main.dungeon.spot_near(m.wpos + (p.wpos - m.wpos).normalized() * 1.0, 0.3)
+		if Skills.is_passive(id):
+			continue
+		var m: Monster = null
+		var bd := INF
+		for o in main.monsters:
+			var dd: float = o.wpos.distance_to(p.wpos)
+			if not o.is_boss and dd < bd:
+				bd = dd
+				m = o
+		if m == null:
+			continue
+		if bd > 1.2:
+			p.wpos = main.dungeon.spot_near(m.wpos + (p.wpos - m.wpos).normalized() * 1.0, 0.3)
+			p.sync_position()
+		p.cds.clear()
+		p.cast_t = 0.0
+		p.atk_t = 0.0
+		p.lunge = {}
+		p.body.position = Vector2.ZERO
+		p.mp = p.st.max_mp
+		p.hp = p.st.max_hp
+		p.set_slot(0, id)
+		tried += 1
+		var at: Vector2 = m.wpos
+		var sk: Dictionary = Skills.SKILLS[id]
+		if sk.kind in ["corpse", "scavenge"] or sk.has("corpse"):
+			var c: Array = main.corpses_near(p.wpos, 999.0, 1)
+			if not c.is_empty():
+				at = c[0].wpos
+				p.wpos = main.dungeon.spot_near(at, 1.5)
 				p.sync_position()
-			p.runes[id] = r
-			p.cds.clear()
-			p.cast_t = 0.0
-			p.atk_t = 0.0
-			p.lunge = {}
-			p.body.position = Vector2.ZERO
-			p.mp = p.st.max_mp
-			p.hp = p.st.max_hp
-			p.set_slot(0, id)
-			tried += 1
-			var at: Vector2 = m.wpos
-			if Skills.SKILLS[id].kind == "corpse" or Skills.SKILLS[id].has("corpse"):
-				var c: Array = main.corpses_near(p.wpos, 999.0, 1)
-				if not c.is_empty():
-					at = c[0].wpos
-					p.wpos = main.dungeon.spot_near(at, 1.5)
-					p.sync_position()
-			if p.use_slot(0, at, null if at != m.wpos else m):
-				ok += 1
-			else:
-				failed.append("%s/%d" % [id, r])
-	print("AUTOTEST skills %s: %d of %d went off, minions %d, corpses %d%s" % [hero, ok, tried, main.minions.size(), main.corpses.size(),
-		"" if failed.is_empty() else ", failed: " + ", ".join(PackedStringArray(failed))])
-	p.bar = Skills.DEFAULT_BAR[hero].duplicate()
+		if p.use_slot(0, at, null if at != m.wpos else m):
+			ok += 1
+		else:
+			failed.append(id)
+	print("AUTOTEST skills %s: %d of %d went off, minions %d, corpses %d, life %d, mana %d%s" % [hero, ok, tried, main.minions.size(), main.corpses.size(),
+		p.st.max_hp, p.st.max_mp, "" if failed.is_empty() else ", failed: " + ", ".join(PackedStringArray(failed))])
+	p.bar = ["", Skills.START[hero]]
 	p.lunge = {}
 	p.body.position = Vector2.ZERO
+
+
+## Diablo II point rules: rows open by level, prerequisites come first, one point per level.
+func _learn_test() -> void:
+	var p: Player = main.player
+	p.set_class("chandra")
+	p.level = 1
+	p.xp = 0
+	p.skill_points = 0
+	var r: Array = []
+	var try := func(id: String) -> String:
+		var why: String = p.why_not_learn(id)
+		return "%s %s" % [id, "ok" if p.learn(id) else why]
+	r.append(try.call("flame_slash"))
+	var to := func(l: int):
+		while p.level < l:
+			p.gain_xp(Player.xp_needed(p.level) - p.xp)
+	to.call(6)
+	r.append("level %d with %d points" % [p.level, p.skill_points])
+	r.append(try.call("flame_slash"))
+	r.append(try.call("flamewake"))
+	r.append(try.call("fireball"))
+	to.call(12)
+	r.append(try.call("fireball"))
+	var d1 := p.dmg_range(p.skill("fireball"))
+	r.append(try.call("shock"))
+	var d2 := p.dmg_range(p.skill("fireball"))
+	r.append("fireball %d-%d, then %d-%d with Shock at %d" % [d1[0], d1[1], d2[0], d2[1], p.skills.shock])
+	print("AUTOTEST learning: " + "; ".join(PackedStringArray(r)))
+
+
+## A hero with points spread through a tree, the skill tree open on one tab with a skill's text.
+func _tree_shot(hero: String, tab: int, tip_id: String) -> void:
+	var p: Player = main.player
+	p.set_class(hero)
+	p.level = 18
+	p.skill_points = 17
+	var plan := {
+		"chandra": ["fireball", "fireball", "inner_fire", "flame_slash", "flamewake", "wall_of_fire", "fireball", "fireball", "shock", "shock", "fervor", "lava_spike", "flame_ward", "fling", "spark_volley", "fireball", "wall_of_fire"],
+		"liliana": ["raise_dead", "raise_dead", "death_mastery", "grave_golem", "golem_mastery", "bone_archers", "blood_golem", "raise_dead", "death_mastery", "agony_warp", "bone_splinters", "grisly_spectacle", "bone_shroud", "raise_dead", "weakness", "bone_archers", "darkness"],
+		"ajani": ["fearsome_roar", "provoke", "ajanis_presence", "battle_cry", "prides_strength", "scavenge", "hunters_eye", "savage_swipe", "twin_claws", "bound", "blade_mastery", "blade_mastery", "battle_cry", "leonin_vigor", "shield_guard", "thick_hide", "battle_cry"],
+	}
+	var learned := 0
+	for id in plan[hero]:
+		if p.learn(id):
+			learned += 1
+	print("AUTOTEST tree %s: %d of %d points spent, %d left" % [hero, learned, plan[hero].size(), p.skill_points])
+	main.hud.close_panels()
+	main.hud.tree_view.tab = tab
+	main.hud.toggle_skills(true)
+	var box: Rect2 = main.hud.tree_view.box(tip_id)
+	get_viewport().warp_mouse(main.hud.tree_view.get_global_rect().position + box.get_center())
+	main.hud.show_skill_tip(tip_id)
 
 
 ## Stand by the biggest pack and cast a few skills, for a screenshot of how they look.
@@ -229,6 +292,9 @@ func _showcase(hero: String, ids: Array) -> void:
 	for m in main.monsters:
 		if m.wpos.distance_to(best.wpos) < 4.0:
 			m.wake()
+	for id in ids:
+		p.skills[id] = 10
+	p.recalc()
 	for id in ids:
 		p.cds.clear()
 		p.cast_t = 0.0
@@ -344,7 +410,7 @@ func _process(dt: float) -> void:
 		if best and bd < 25.0:
 			p.command_attack(best)
 			if bd < 6.0 and main.dungeon.los(p.wpos, best.wpos):
-				p.use_slot(randi_range(1, 5), best.wpos, best)
+				p.use_slot(1, best.wpos, best)
 	wait -= dt
 	if wait <= 0.0 and step_i < steps.size():
 		steps[step_i][1].call()

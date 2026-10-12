@@ -5,6 +5,7 @@ extends Figure
 ## attacks the nearest foe, and monsters that stand next to it attack it back.
 
 var skill_id := ""
+var group := ""             # minions of one group share a limit (all golems)
 var kind := "bonewalker"
 var d: Dictionary
 var hp := 1.0
@@ -29,6 +30,7 @@ var spawn_t := 0.4
 ## s: the resolved summon skill (see Skills); level and minion_bonus (%) come from the hero.
 func setup(s: Dictionary, at: Vector2, level: int, minion_bonus: float) -> void:
 	skill_id = s.id
+	group = s.get("group", s.id)
 	kind = s.minion
 	d = Monster.TYPES[kind]
 	wpos = at
@@ -58,7 +60,7 @@ func _ready() -> void:
 func take_hit(amount: int) -> void:
 	if dead:
 		return
-	hp -= amount
+	hp -= amount * (1.0 - minf(75.0, main.player.fx.get("minion_dr", 0.0)) / 100.0)
 	hit = 0.12
 	if hp <= 0.0:
 		die()

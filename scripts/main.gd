@@ -580,6 +580,8 @@ func damage_monster(m: Monster, dmg: int, color: Color) -> int:
 		dmg = roundi(dmg * (1.0 + m.vuln / 100.0))
 	m.hp -= dmg
 	m.hit = 0.12
+	if m.tap_t > 0.0 and not player.dead:
+		player.hp = minf(player.st.max_hp, player.hp + dmg * m.tap / 100.0)
 	if not m.aggro:
 		m.wake()
 	floater(m.wpos, str(dmg), color)
@@ -718,22 +720,10 @@ func show_msg(title: String, sub: String, dur := 3.0) -> void:
 
 
 func _on_level_up(level: int) -> void:
-	var learned: Array = []
-	for id in Skills.of_hero(player.cls):
-		if Skills.SKILLS[id].lvl == level:
-			learned.append(Skills.SKILLS[id].name)
-		for r in Skills.SKILLS[id].runes:
-			if r.lvl == level:
-				learned.append("%s rune for %s" % [r.name, Skills.SKILLS[id].name])
-	for id in Skills.passives_of(player.cls):
-		if Skills.PASSIVES[id].lvl == level:
-			learned.append("passive " + Skills.PASSIVES[id].name)
-	if level in Skills.PASSIVE_SLOTS:
-		learned.append("a passive slot")
 	var extra := ""
-	if not learned.is_empty():
-		extra = "\nNew: %s. Press S to set your skills." % ", ".join(learned)
-	show_msg("Level %d" % level, "5 new stat points: press C to spend them.%s" % extra, 4.5)
+	if level in Skills.ROW_LVL:
+		extra = "\nA new row of skills has opened."
+	show_msg("Level %d" % level, "5 stat points (C) and a skill point (S) to spend.%s" % extra, 4.5)
 	hud.refresh()
 
 
@@ -782,13 +772,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("drink_mana"):
 		player.drink("mp")
 	elif event.is_action_pressed("skill_1"):
-		use_slot(2)
+		_skill_key(0)
 	elif event.is_action_pressed("skill_2"):
-		use_slot(3)
+		_skill_key(1)
 	elif event.is_action_pressed("skill_3"):
-		use_slot(4)
+		_skill_key(2)
 	elif event.is_action_pressed("skill_4"):
-		use_slot(5)
+		_skill_key(3)
 	elif event.is_action_pressed("toggle_skills"):
 		hud.toggle_skills()
 	elif event.is_action_pressed("toggle_inv"):
@@ -809,7 +799,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		hud.close_panels()
 
 
-## Use a hotbar skill at the cursor, on the monster under it if there is one.
+## Keys 1-4, as the F keys in Diablo II: over a skill in the skill tree or the skill picker they
+## bind it to the key, otherwise they put the key's skill on the right mouse button.
+func _skill_key(k: int) -> void:
+	var id: String = hud.hovered_skill
+	if id != "" and player.skill_level(id) > 0 and not Skills.is_passive(id):
+		player.bind_key(k, id)
+		floater(player.wpos, "%s on key %d" % [Skills.SKILLS[id].name, k + 1], Color("c8a165"))
+	elif player.select_key(k):
+		floater(player.wpos, Skills.SKILLS[player.bar[1]].name, Color("c8a165"))
+
+
+## Use a mouse-button skill at the cursor, on the monster under it if there is one.
 func use_slot(i: int) -> void:
 	_update_hover()
 	player.use_slot(i, hovered_monster.wpos if hovered_monster else mouse_world(), hovered_monster)

@@ -202,3 +202,23 @@ games using their IP need written permission, so whether to publish is his call.
    specters (now throw hexes), plague spitters and the Gurmag Angler with its lure.
 The smoke test now shows the hero choice and casts every skill of every hero with every rune.
 
+## 14. Diablo II skill system (2026-10-12)
+> Adjust hero design, I want skill system to be more derived from Diablo 2 instead
+
+Read as: keep the three planeswalkers and their looks, replace the Diablo III skill system with
+Diablo II's. Each hero now has three trees of ten skills mirroring the Barbarian (Combat, masteries,
+warcries), Sorceress (fire, lightning, and a fire "Pyromancy" tree where she has cold) and Necromancer
+(summoning, poison and bone, curses), with MTG names. Rows open at levels 1, 6, 12, 18, 24 and 30;
+prerequisite lines; one skill point per level; up to 20 points with Diablo II's level cap per point;
+every point grows the skill, synergies add damage per point in related skills; passives (weapon
+masteries, Inner Fire, Death Mastery...) work all the time; "+N to All Skills" affixes and Crusade
+(Battle Command). Ferocity and Soul are gone: everyone uses mana, which refills in 30 seconds. Runes,
+passive slots and the six-slot bar are gone: one skill per mouse button, keys 1-4 swap the right one
+(Diablo II's F keys), a picker on the bar buttons. New mechanics: corpse-raised skeletons and archers,
+one golem at a time (four kinds), Unearth revives a slain monster, Bone Shroud absorbs damage, Mana
+Barrier, Flamewake fire trail, Living Storm, Wall of Fire, Static Discharge (a quarter of current life),
+Scavenge/Hunter's Eye/Grim Totem on corpses, and curses that blind (Darkness), reflect melee (Torment),
+confuse (Delirium), lure (Lure of the Grave) and heal on hit (Vampiric Embrace). Each hero starts with
+one point in Savage Swipe, Shock or Drain Life. The smoke test casts all 73 active skills, checks the
+point rules and a synergy, and shows each tree.
+

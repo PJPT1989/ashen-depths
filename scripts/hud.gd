@@ -17,13 +17,19 @@ var mana_orb: Orb
 var xp_bar: ProgressBar
 var hp_btn: Button
 var mp_btn: Button
-var skill_btns: Array = []     # SkillButton per hotbar slot
+var skill_btns: Array = []     # SkillButton for the left and right mouse skills
+var key_btns: Array = []       # Button per key 1-4
 var stat_btn: Button
+var skill_btn: Button
 var skills_panel: PanelContainer
 var skills_title: Label
-var skill_rows: Array = []     # per slot: {pick: OptionButton, rune: OptionButton, desc: Label}
-var passive_rows: Array = []   # per passive slot: {pick: OptionButton, desc: Label}
-var skills_hint: Label
+var skills_points: Label
+var tab_btns: Array = []
+var tree_view: TreeView
+var picker: PanelContainer     # choose the left or right mouse skill
+var picker_flow: HFlowContainer
+var picker_slot := 0
+var hovered_skill := ""        # skill under the mouse in the tree or the picker (keys 1-4 bind it)
 var level_lbl: Label
 var area_lbl: Label
 var gold_lbl: Label
@@ -62,8 +68,8 @@ var char_title: Label
 var dead_screen: Control
 
 
-## A hotbar slot: skill name, its key, a strip in its element's colour, and a shade that
-## shrinks as the cooldown runs out. Dim when the hero can't pay for it.
+## The left or right mouse skill: its name, a strip in its colour, and a shade while its
+## casting delay runs. Dim when the hero hasn't the mana for it. Click to choose another.
 class SkillButton extends Button:
 	var hud
 	var slot := 0
@@ -72,16 +78,109 @@ class SkillButton extends Button:
 	func _draw() -> void:
 		var p: Player = hud.main.player
 		var id: String = p.bar[slot]
-		if id == "":
+		draw_rect(Rect2(2, 2, size.x - 4, 3), hud.skill_color(id))
+		if id == "" or p.skill_level(id) <= 0:
 			return
-		var sk := Skills.resolve(id, p.runes.get(id, -1))
-		draw_rect(Rect2(2, 2, size.x - 4, 3), Player.elem_color(sk.get("elem", "phys")) if sk.has("elem") else Skills.RESOURCE[p.cls].color)
+		var sk := p.skill(id)
 		var cd: float = p.cds.get(id, 0.0)
-		var full: float = sk.get("cd", 0.0) * p.fx.get("cdr", 1.0)
+		var full: float = sk.get("cd", 0.0)
 		if cd > 0.0 and full > 0.0:
 			draw_rect(Rect2(1, 1, size.x - 2, (size.y - 2) * cd / full), Color(0, 0, 0, 0.6))
 		if p.mp < p.skill_cost(sk):
 			draw_rect(Rect2(1, 1, size.x - 2, size.y - 2), Color(0.05, 0.08, 0.3, 0.45))
+
+
+## One skill tree, drawn like Diablo II's: six rows by level, three columns, lines from each
+## skill to the ones it opens. Click a skill to spend a point; hover it for what it does.
+class TreeView extends Control:
+	const CELL := Vector2(142, 62)
+	const XS := [94, 260, 426]
+	const ROW_H := 88
+	var hud
+	var tab := 0
+	var hover := ""
+	func _ready() -> void:
+		custom_minimum_size = Vector2(520, 6 * ROW_H + 8)
+		mouse_filter = Control.MOUSE_FILTER_STOP
+		mouse_exited.connect(func():
+			hover = ""
+			hud.hovered_skill = ""
+			hud.hide_tip()
+			queue_redraw())
+	func box(id: String) -> Rect2:
+		var sk: Dictionary = Skills.SKILLS[id]
+		return Rect2(Vector2(XS[sk.col] - CELL.x / 2.0, 12 + sk.row * ROW_H), CELL)
+	func _gui_input(e: InputEvent) -> void:
+		var p: Player = hud.main.player
+		if e is InputEventMouseMotion:
+			var h := ""
+			for id in Skills.of_tab(p.cls, tab):
+				if box(id).has_point(e.position):
+					h = id
+			if h != hover:
+				hover = h
+				hud.hovered_skill = h
+				if h != "":
+					hud.show_skill_tip(h)
+				else:
+					hud.hide_tip()
+				queue_redraw()
+		elif e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT and hover != "":
+			if p.learn(hover):
+				hud.show_skill_tip(hover)
+				hud.refresh()
+			else:
+				hud.main.floater(p.wpos, p.why_not_learn(hover), Color("bbbbbb"))
+			accept_event()
+	func _draw() -> void:
+		var p: Player = hud.main.player
+		var font: Font = Game.font_bold
+		var body: Font = get_theme_default_font()
+		for r in 6:
+			draw_string(body, Vector2(4, 12 + r * ROW_H + 36), "Lv %d" % Skills.ROW_LVL[r], HORIZONTAL_ALIGNMENT_LEFT, -1, 12,
+				Color("c8a165") if p.level >= Skills.ROW_LVL[r] else Color("5a5045"))
+		var ids: Array = Skills.of_tab(p.cls, tab)
+		for id in ids:
+			var to := box(id)
+			for rq in Skills.SKILLS[id].req:
+				var from := box(rq)
+				var col := Color("c8a165") if p.skills.get(rq, 0) > 0 else Color("4a3f33")
+				var a := Vector2(from.get_center().x, from.end.y)
+				var b := Vector2(to.get_center().x, to.position.y)
+				if absf(a.x - b.x) < 1.0:
+					draw_line(a, b, col, 3.0)
+				else:
+					var mid := a.y + 12.0
+					draw_line(a, Vector2(a.x, mid), col, 3.0)
+					draw_line(Vector2(a.x, mid), Vector2(b.x, mid), col, 3.0)
+					draw_line(Vector2(b.x, mid), b, col, 3.0)
+		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 250.0)
+		for id in ids:
+			var rc := box(id)
+			var pts: int = p.skills.get(id, 0)
+			var why := p.why_not_learn(id)
+			var open := why == "" or (why == "No skill points left" or why == "Already at its highest level")
+			var col: Color = hud.skill_color(id)
+			draw_rect(rc, Color(0.13, 0.1, 0.08) if pts > 0 else Color(0.06, 0.05, 0.04))
+			draw_rect(Rect2(rc.position, Vector2(rc.size.x, 4)), col if pts > 0 else col.darkened(0.6))
+			var edge := col.lerp(Color.WHITE, 0.3 * pulse) if why == "" else (col.darkened(0.2) if pts > 0 else Color("3a3129"))
+			draw_rect(rc, edge, false, 2.0 if why == "" or id == hover else 1.0)
+			var tc := Color("ddd3c0") if pts > 0 else (Color("a39886") if open else Color("5e5448"))
+			draw_multiline_string(font, rc.position + Vector2(6, 24), Skills.SKILLS[id].name, HORIZONTAL_ALIGNMENT_LEFT, rc.size.x - 34, 15, 2, tc)
+			if Skills.is_passive(id):
+				draw_string(body, rc.position + Vector2(6, rc.size.y - 6), "passive", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("8f8575"))
+			var lv := p.skill_level(id)
+			var txt := str(pts) if lv == pts else "%d+%d" % [pts, lv - pts]
+			var pr := Rect2(rc.end - Vector2(30, 22), Vector2(28, 20))
+			draw_rect(pr, Color(0.02, 0.02, 0.02))
+			draw_rect(pr, Color("6a5a45"), false, 1.0)
+			draw_string(font, pr.position + Vector2(0, 16), txt, HORIZONTAL_ALIGNMENT_CENTER, pr.size.x, 14, Color("f2d25c") if pts > 0 else Color("6a6050"))
+			var k: int = p.keys.find(id)
+			if k >= 0:
+				draw_string(body, rc.end - Vector2(48, 6), str(k + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("8597ff"))
+	func _process(_dt: float) -> void:
+		if is_visible_in_tree():
+			queue_redraw()
 
 
 ## Draws the item on the cursor.
@@ -240,20 +339,30 @@ func _build_bottom_bar() -> void:
 	for b in [hp_btn, mp_btn]:
 		b.custom_minimum_size = Vector2(62, 44)
 		slots.add_child(b)
-	for i in Skills.SLOT_KEYS.size():
+	for i in 2:
 		var sb := SkillButton.new()
 		sb.hud = self
 		sb.slot = i
 		sb.focus_mode = Control.FOCUS_NONE
-		sb.custom_minimum_size = Vector2(86, 44)
-		sb.add_theme_font_size_override("font_size", 12)
-		sb.pressed.connect(func(): toggle_skills(true))
-		sb.mouse_entered.connect(func(): _skill_tip(i))
+		sb.custom_minimum_size = Vector2(108, 44)
+		sb.add_theme_font_size_override("font_size", 13)
+		sb.pressed.connect(func(): open_picker(i))
+		sb.mouse_entered.connect(func(): _bar_tip(i))
 		sb.mouse_exited.connect(hide_tip)
-		slots.add_child(sb)
 		skill_btns.append(sb)
+	slots.add_child(skill_btns[0])
+	for k in 4:
+		var kb := _button("", func():
+			main.player.select_key(k)
+			refresh())
+		kb.custom_minimum_size = Vector2(62, 44)
+		kb.add_theme_font_size_override("font_size", 11)
+		slots.add_child(kb)
+		key_btns.append(kb)
+	slots.add_child(skill_btns[1])
 	stat_btn = _button("Char\nC", toggle_char)
-	var sk_btn := _button("Skills\nS", func(): toggle_skills())
+	skill_btn = _button("Skills\nS", func(): toggle_skills())
+	var sk_btn := skill_btn
 	var bag_btn := _button("Bag\nI", toggle_inv)
 	var map_btn := _button("Map\nTab", toggle_map)
 	var tp_btn := _button("Portal\nT", func(): main.open_town_portal())
@@ -348,7 +457,7 @@ func _build_inventory() -> void:
 const STAT_NAMES := {"str": "Strength", "dex": "Dexterity", "vit": "Vitality", "ene": "Energy"}
 const STAT_HELP := {"str": "+1% weapon damage", "dex": "+5 attack rating, block", "vit": "+%d life", "ene": "+%d mana"}
 const DERIVED := ["Damage", "Attack Rating", "Chance to Hit", "Defense", "Chance to Block", "Attacks per Second", "Life", "Mana",
-	"Fire Resist", "Cold Resist", "Lightning Resist", "Poison Resist", "Run Speed", "Magic Find", "Spell Damage"]
+	"Fire Resist", "Cold Resist", "Lightning Resist", "Poison Resist", "Run Speed", "Magic Find", "Spell Damage", "All Skills"]
 var char_help := {}
 
 
@@ -411,7 +520,7 @@ func _refresh_character() -> void:
 	var c: Dictionary = Player.CLASSES[p.cls]
 	char_title.text = c.name
 	char_help.vit.text = "+%d life" % c.life_vit
-	char_help.ene.text = ("+%d mana" % c.mana_ene) if p.cls != "ajani" else "no effect on Ferocity"
+	char_help.ene.text = "+%d mana" % c.mana_ene
 	char_vals["Mana_name"].text = Skills.RESOURCE[p.cls].name
 	char_head.text = "Level %d" % p.level
 	char_xp.text = "Experience %d / %d" % [p.xp, Player.xp_needed(p.level)]
@@ -431,7 +540,7 @@ func _refresh_character() -> void:
 		"Life": "%d / %d" % [ceili(p.hp), s.max_hp], "Mana": "%d / %d" % [floori(p.mp), s.max_mp],
 		"Fire Resist": "%d%%" % s.res_fire, "Cold Resist": "%d%%" % s.res_cold, "Lightning Resist": "%d%%" % s.res_lit,
 		"Poison Resist": "%d%%" % s.res_pois, "Run Speed": "+%d%%" % roundi((s.speed / Player.SPEED - 1.0) * 100),
-		"Magic Find": "%d%%" % s.mf, "Spell Damage": "%d-%d" % [s.spell_dmg[0], s.spell_dmg[1]],
+		"Magic Find": "%d%%" % s.mf, "Spell Damage": "+%d%%" % s.spell, "All Skills": "+%d" % p.bonus_skills,
 	}
 	for k in vals:
 		char_vals[k].text = vals[k]
@@ -439,175 +548,168 @@ func _refresh_character() -> void:
 
 # ---------- skills ----------
 
+## A colour for each skill: its element, gold for passives, green for summons, violet for curses.
+func skill_color(id: String) -> Color:
+	if id == "":
+		return Color("c9b99a")
+	var sk: Dictionary = Skills.SKILLS[id]
+	if sk.kind == "passive":
+		return GOLD
+	if sk.kind == "summon":
+		return Color("6fd08a")
+	if sk.kind == "curse":
+		return Color("b070ff")
+	if sk.has("elem"):
+		return Player.elem_color(sk.elem)
+	if sk.kind in ["buff", "shout", "shield"]:
+		return Color("e8c26a")
+	return Color("d8cbb0")
+
+
 func _build_skills() -> void:
 	skills_panel = PanelContainer.new()
 	skills_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	skills_panel.position = Vector2(16, 16)
-	skills_panel.custom_minimum_size = Vector2(600, 0)
 	skills_panel.visible = false
 	root.add_child(skills_panel)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 4)
+	v.add_theme_constant_override("separation", 6)
 	skills_panel.add_child(v)
-	skills_title = _panel_head(v, "Skills", func(): toggle_skills(false))
-	for i in Skills.SLOT_KEYS.size():
-		var h := HBoxContainer.new()
-		h.add_theme_constant_override("separation", 8)
-		v.add_child(h)
-		var key := _label(["Left click", "Right click", "Key 1", "Key 2", "Key 3", "Key 4"][i], 14, GOLD, Game.font_bold)
-		key.custom_minimum_size = Vector2(84, 0)
-		h.add_child(key)
-		var pick := OptionButton.new()
-		pick.focus_mode = Control.FOCUS_NONE
-		pick.custom_minimum_size = Vector2(250, 0)
-		pick.item_selected.connect(func(idx): _pick_skill(i, idx))
-		h.add_child(pick)
-		var rune := OptionButton.new()
-		rune.focus_mode = Control.FOCUS_NONE
-		rune.custom_minimum_size = Vector2(230, 0)
-		rune.item_selected.connect(func(idx): _pick_rune(i, idx))
-		h.add_child(rune)
-		var desc := _label("", 12, MUTED)
-		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		desc.custom_minimum_size = Vector2(580, 0)
-		v.add_child(desc)
-		skill_rows.append({"pick": pick, "rune": rune, "desc": desc})
-	v.add_child(HSeparator.new())
-	v.add_child(_label("Passives", 18, GOLD, Game.font_display))
-	for i in Skills.PASSIVE_SLOTS.size():
-		var h := HBoxContainer.new()
-		h.add_theme_constant_override("separation", 8)
-		v.add_child(h)
-		var pick := OptionButton.new()
-		pick.focus_mode = Control.FOCUS_NONE
-		pick.custom_minimum_size = Vector2(250, 0)
-		pick.item_selected.connect(func(idx): _pick_passive(i, idx))
-		h.add_child(pick)
-		var desc := _label("", 12, MUTED)
-		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		h.add_child(desc)
-		passive_rows.append({"pick": pick, "desc": desc})
-	skills_hint = _label("New skills, runes and passives unlock as you gain levels. A rune changes how its skill works.", 12, MUTED)
-	skills_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	skills_hint.custom_minimum_size = Vector2(580, 0)
-	v.add_child(skills_hint)
+	skills_title = _panel_head(v, "Skill Tree", func(): toggle_skills(false))
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 6)
+	v.add_child(tabs)
+	for i in 3:
+		var b := _button("", func(): _pick_tab(i))
+		b.toggle_mode = true
+		b.custom_minimum_size = Vector2(168, 34)
+		tabs.add_child(b)
+		tab_btns.append(b)
+	skills_points = _label("", 15, Color("f2d25c"))
+	v.add_child(skills_points)
+	tree_view = TreeView.new()
+	tree_view.hud = self
+	v.add_child(tree_view)
+	var hint := _label("Click a skill to spend a point. Over a skill, press 1-4 to put it on that key; in play, 1-4 put that skill on the right mouse button.", 12, MUTED)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size = Vector2(520, 0)
+	v.add_child(hint)
+
+	picker = PanelContainer.new()
+	picker.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	picker.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	picker.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	picker.position.y = -118
+	picker.visible = false
+	root.add_child(picker)
+	var pv := VBoxContainer.new()
+	picker.add_child(pv)
+	pv.add_child(_label("Choose a skill. Press 1-4 over one to put it on that key.", 12, MUTED))
+	picker_flow = HFlowContainer.new()
+	picker_flow.custom_minimum_size = Vector2(640, 0)
+	picker_flow.add_theme_constant_override("h_separation", 4)
+	picker_flow.add_theme_constant_override("v_separation", 4)
+	pv.add_child(picker_flow)
 
 
-## Fill the lists from the hero: unlocked choices are enabled, locked ones show their level.
+func _pick_tab(i: int) -> void:
+	tree_view.tab = i
+	_refresh_skills()
+
+
 func _refresh_skills() -> void:
 	var p: Player = main.player
-	var hero := p.cls
-	skills_title.text = "Skills · %s" % Player.CLASSES[hero].name
-	var cats: Array = Skills.CATEGORIES[hero]
-	for i in skill_rows.size():
-		var row: Dictionary = skill_rows[i]
-		var pick: OptionButton = row.pick
-		pick.clear()
-		pick.add_item("(empty)")
-		pick.set_item_metadata(0, "")
-		var sel := 0
-		for id in Skills.of_hero(hero):
-			var sk: Dictionary = Skills.SKILLS[id]
-			var n := pick.item_count
-			pick.add_item("%s: %s%s" % [cats[sk.cat], sk.name, "" if p.level >= sk.lvl else "  (level %d)" % sk.lvl])
-			pick.set_item_metadata(n, id)
-			pick.set_item_disabled(n, p.level < sk.lvl)
-			if p.bar[i] == id:
-				sel = n
-		pick.select(sel)
-		var rune: OptionButton = row.rune
-		rune.clear()
-		var id: String = p.bar[i]
-		if id == "":
-			rune.disabled = true
-			row.desc.text = ""
-			continue
-		rune.disabled = false
-		rune.add_item("No rune")
-		var sk: Dictionary = Skills.SKILLS[id]
-		for r in sk.runes:
-			var n := rune.item_count
-			rune.add_item("%s%s" % [r.name, "" if p.level >= r.lvl else "  (level %d)" % r.lvl])
-			rune.set_item_disabled(n, p.level < r.lvl)
-		var cur: int = p.runes.get(id, -1)
-		rune.select(cur + 1)
-		row.desc.text = _skill_text(id, cur)
-	var open := Skills.passive_slots(p.level)
-	for i in passive_rows.size():
-		var row: Dictionary = passive_rows[i]
-		var pick: OptionButton = row.pick
-		pick.clear()
-		if i >= open:
-			pick.add_item("Opens at level %d" % Skills.PASSIVE_SLOTS[i])
-			pick.disabled = true
-			row.desc.text = ""
-			continue
-		pick.disabled = false
-		pick.add_item("(empty)")
-		pick.set_item_metadata(0, "")
-		var cur: String = p.passives[i] if i < p.passives.size() else ""
-		var sel := 0
-		for id in Skills.passives_of(p.cls):
-			var ps: Dictionary = Skills.PASSIVES[id]
-			var n := pick.item_count
-			pick.add_item("%s%s" % [ps.name, "" if p.level >= ps.lvl else "  (level %d)" % ps.lvl])
-			pick.set_item_metadata(n, id)
-			pick.set_item_disabled(n, p.level < ps.lvl or (id in p.passives and id != cur))
-			if id == cur:
-				sel = n
-		pick.select(sel)
-		row.desc.text = Skills.PASSIVES[cur].desc if cur != "" else ""
+	skills_title.text = "Skill Tree · %s" % Player.CLASSES[p.cls].name
+	for i in 3:
+		var spent := 0
+		for id in Skills.of_tab(p.cls, i):
+			spent += p.skills.get(id, 0)
+		tab_btns[i].text = Skills.TABS[p.cls][i] + ("  (%d)" % spent if spent > 0 else "")
+		tab_btns[i].button_pressed = i == tree_view.tab
+	skills_points.text = "Skill points left: %d" % p.skill_points
+	tree_view.queue_redraw()
 
 
-func _pick_skill(i: int, idx: int) -> void:
-	main.player.set_slot(i, skill_rows[i].pick.get_item_metadata(idx))
-	_refresh_skills()
-
-
-func _pick_rune(i: int, idx: int) -> void:
-	var id: String = main.player.bar[i]
-	if id != "":
-		main.player.set_rune(id, idx - 1)
-	_refresh_skills()
-
-
-func _pick_passive(i: int, idx: int) -> void:
-	main.player.set_passive(i, passive_rows[i].pick.get_item_metadata(idx))
-	_refresh_skills()
-
-
-## What a skill does with rune r, its cost and cooldown.
-func _skill_text(id: String, r: int) -> String:
-	var sk: Dictionary = Skills.SKILLS[id]
-	var t: String = sk.desc
-	if r >= 0:
-		t += " Rune %s: %s" % [sk.runes[r].name, sk.runes[r].desc]
-	var s := Skills.resolve(id, r)
-	var bits: Array = []
-	if s.get("cd", 0) > 0:
-		bits.append("cooldown %ss" % str(s.cd))
-	if s.get("gen", 0) > 0:
-		bits.append("builds %d" % s.gen)
-	if not bits.is_empty():
-		t += " (" + ", ".join(bits) + ")"
-	return t
-
-
-func _skill_tip(i: int) -> void:
+## The left or right mouse skill picker: the plain attack and every skill with a point in it.
+func open_picker(slot: int) -> void:
+	if picker.visible and picker_slot == slot:
+		picker.visible = false
+		return
+	picker_slot = slot
 	var p: Player = main.player
-	var id: String = p.bar[i]
-	if id == "":
-		tip_text.text = "[center][b]Empty slot[/b][/center]\nClick to choose a skill."
-	else:
-		var r: int = p.runes.get(id, -1)
-		var head: String = Skills.SKILLS[id].name + ("  ·  " + Skills.SKILLS[id].runes[r].name if r >= 0 else "")
-		tip_text.text = "[center][b]%s[/b][/center]\n%s\n[color=#8f8575]Click to change.[/color]" % [head, _skill_text(id, r)]
+	for c in picker_flow.get_children():
+		c.queue_free()
+	var ids: Array = [""]
+	for id in Skills.of_hero(p.cls):
+		if p.skill_level(id) > 0 and not Skills.is_passive(id):
+			ids.append(id)
+	for id in ids:
+		var k: int = p.keys.find(id) if id != "" else -1
+		var b := _button((Skills.SKILLS[id].name if id != "" else "Attack") + ("  [%d]" % (k + 1) if k >= 0 else ""), func():
+			p.set_slot(picker_slot, id)
+			picker.visible = false
+			hovered_skill = ""
+			hide_tip()
+			refresh())
+		b.add_theme_color_override("font_color", skill_color(id).lightened(0.2))
+		if p.bar[slot] == id:
+			b.add_theme_color_override("font_color", Color("f2d25c"))
+		b.mouse_entered.connect(func():
+			hovered_skill = id
+			if id != "":
+				show_skill_tip(id))
+		b.mouse_exited.connect(func():
+			hovered_skill = ""
+			hide_tip())
+		picker_flow.add_child(b)
+	picker.visible = true
+	picker.reset_size()
+
+
+## Diablo II style text for a skill: what it does now and at the next level.
+func show_skill_tip(id: String) -> void:
+	var p: Player = main.player
+	var sk: Dictionary = Skills.SKILLS[id]
+	var t := "[center][b]%s[/b]\n[color=#8f8575]%s tree%s[/color][/center]\n%s\n" % [sk.name, Skills.TABS[p.cls][sk.tab], " · passive" if Skills.is_passive(id) else "", sk.desc]
+	var pts: int = p.skills.get(id, 0)
+	var need: int = Skills.req_level(id)
+	t += "[color=%s]Required level: %d[/color]\n" % ["#ddd3c0" if p.level >= need else "#ff6b5b", need]
+	for rq in sk.req:
+		t += "[color=%s]Requires %s[/color]\n" % ["#ddd3c0" if p.skills.get(rq, 0) > 0 else "#ff6b5b", Skills.SKILLS[rq].name]
+	if pts > 0:
+		var lv := p.skill_level(id)
+		t += "\n[color=#f2d25c]Current level: %d%s[/color]\n" % [lv, " (%d +%d)" % [pts, lv - pts] if lv != pts else ""]
+		var cur := p.skill(id)
+		t += "\n".join(PackedStringArray(Skills.lines(cur, p.dmg_range(cur)))) + "\n"
+	if pts < Skills.MAX_POINTS:
+		var nxt := Skills.resolve(id, p.skill_level(id) + 1 if pts > 0 else 1, p.skills)
+		t += "\n[color=#8597ff]%s:[/color]\n" % ("Next level" if pts > 0 else "First level")
+		t += "[color=#b8b0a0]" + "\n".join(PackedStringArray(Skills.lines(nxt, p.dmg_range(nxt)))) + "[/color]\n"
+	if not sk.get("syn", {}).is_empty():
+		var bits: Array = []
+		for k in sk.syn:
+			bits.append("%s +%d%%" % [Skills.SKILLS[k].name, sk.syn[k]])
+		t += "\n[color=#c8a165]Damage per point in: %s[/color]\n" % ", ".join(PackedStringArray(bits))
+	var key: int = p.keys.find(id)
+	if key >= 0:
+		t += "[color=#8597ff]On key %d[/color]\n" % (key + 1)
+	var why := p.why_not_learn(id)
+	t += "\n[center][color=%s]%s[/color][/center]" % ["#e2c26a" if why == "" else "#8f8575", "Click to spend a point" if why == "" else why]
+	tip_text.text = t
 	tip.visible = true
 	tip.reset_size()
 
 
-# ---------- trade, waypoints, talk ----------
+func _bar_tip(i: int) -> void:
+	var p: Player = main.player
+	var id: String = p.bar[i]
+	if id == "":
+		tip_text.text = "[center][b]Attack[/b][/center]\nA plain blow with your weapon.\n[color=#8f8575]Click to choose another skill.[/color]"
+		tip.visible = true
+		tip.reset_size()
+	else:
+		show_skill_tip(id)
+
 
 func _build_trade() -> void:
 	trade_panel = PanelContainer.new()
@@ -777,7 +879,11 @@ func toggle_skills(force = null) -> void:
 	if skills_panel.visible:
 		char_panel.visible = false
 		trade_panel.visible = false
+		picker.visible = false
 		_refresh_skills()
+	else:
+		hovered_skill = ""
+		hide_tip()
 
 
 func toggle_map() -> void:
@@ -788,6 +894,8 @@ func close_panels() -> void:
 	inv_panel.visible = false
 	char_panel.visible = false
 	skills_panel.visible = false
+	picker.visible = false
+	hovered_skill = ""
 	trade_panel.visible = false
 	wp_panel.visible = false
 	dialog.visible = false
@@ -833,8 +941,8 @@ func _build_title() -> Control:
 	kc.add_child(keys)
 	v.add_child(kc)
 	for row in [["Left click", "Walk; on a foe, use your left-click skill"], ["Right click", "Use your right-click skill"],
-			["1 · 2 · 3 · 4", "Use the skills on those keys"], ["Q · W", "Drink healing or mana draught"],
-			["S", "Skills: choose skills, runes, passives"], ["C · I · Tab", "Character, inventory, map"],
+			["1 · 2 · 3 · 4", "Swap the right-click skill"], ["Q · W", "Drink healing or mana draught"],
+			["S", "Skill tree: spend skill points"], ["C · I · Tab", "Character, inventory, map"],
 			["T · M", "Town portal, sound"], ["L", "Graphics quality: low, medium, high"]]:
 		keys.add_child(_label(row[0], 14, BONE, Game.font_bold))
 		keys.add_child(_label(row[1], 14, MUTED))
@@ -984,11 +1092,15 @@ func _process(dt: float) -> void:
 	xp_bar.value = p.xp
 	hp_btn.text = "%d/%d\nHeal · Q" % [p.belt.hp, s.belt_cap]
 	mp_btn.text = "%d/%d\nMana · W" % [p.belt.mp, s.belt_cap]
-	for i in skill_btns.size():
+	for i in 2:
 		var id: String = p.bar[i]
-		var key: String = ["Left", "Right", "1", "2", "3", "4"][i]
-		skill_btns[i].text = ("%s\n%s" % [Skills.SKILLS[id].name, key]) if id != "" else "empty\n" + key
-		skill_btns[i].modulate.a = 1.0 if id != "" else 0.5
+		skill_btns[i].text = "%s\n%s" % [Skills.SKILLS[id].name if id != "" else "Attack", ["Left", "Right"][i]]
+	for k in 4:
+		var id: String = p.keys[k]
+		key_btns[k].text = "%s\n%d" % [Skills.SKILLS[id].name if id != "" else "-", k + 1]
+		key_btns[k].modulate = Color(1.25, 1.15, 0.7) if id != "" and id == p.bar[1] else (Color.WHITE if id != "" else Color(1, 1, 1, 0.5))
+	skill_btn.text = "Skills\n" + ("+%d" % p.skill_points if p.skill_points > 0 else "S")
+	skill_btn.modulate = Color(1.3, 1.15, 0.6) if p.skill_points > 0 and fmod(Time.get_ticks_msec() / 600.0, 2.0) < 1.0 else Color.WHITE
 	stat_btn.text = "Char\n" + ("+%d" % p.stat_points if p.stat_points > 0 else "C")
 	stat_btn.modulate = Color(1.3, 1.15, 0.6) if p.stat_points > 0 and fmod(Time.get_ticks_msec() / 600.0, 2.0) < 1.0 else Color.WHITE
 	level_lbl.text = "Level %d" % p.level
