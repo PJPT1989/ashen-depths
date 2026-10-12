@@ -1,14 +1,14 @@
 class_name Player
 extends Figure
-## The Wanderer: the four Diablo II attributes, equipment on ten slots, a 10 x 4 inventory
-## grid (charms work while they sit in it), melee and two spells.
+## The hero, one of three planeswalkers (CLASSES): the four Diablo II attributes, equipment on
+## ten slots, a 10 x 4 inventory grid (charms work while they sit in it), melee and two spells.
 ##
 ## Attributes work as in Diablo II:
 ##   Strength   +1% weapon damage per point; needed to use heavier gear.
 ##   Dexterity  +5 attack rating per point, +1 defense per 4 points, better chance to block;
 ##              needed for finer weapons.
-##   Vitality   +3 life per point.
-##   Energy     +2 mana per point.
+##   Vitality   life per point, by class (as the Barbarian, Sorceress and Necromancer).
+##   Energy     mana per point, by class.
 
 signal stats_changed
 signal leveled_up(level: int)
@@ -16,7 +16,17 @@ signal leveled_up(level: int)
 const SPEED := 3.6
 const GRID_W := 10
 const GRID_H := 4
-const BASE_STATS := {"str": 25, "dex": 20, "vit": 25, "ene": 15}
+## The planeswalkers. Starting attributes, life and mana follow the Diablo II class each one
+## stands in for: Ajani the Barbarian, Chandra the Sorceress, Liliana the Necromancer.
+const CLASSES := {
+	"ajani": {"name": "Ajani Goldmane", "role": "Leonin warrior. Fights up close and takes a beating.",
+		"stats": {"str": 30, "dex": 20, "vit": 25, "ene": 10}, "life": 55, "life_lvl": 2.0, "life_vit": 4, "mana": 10, "mana_lvl": 1.0, "mana_ene": 1},
+	"chandra": {"name": "Chandra Nalaar", "role": "Pyromancer. Fragile, with the strongest spells.",
+		"stats": {"str": 10, "dex": 25, "vit": 10, "ene": 35}, "life": 40, "life_lvl": 1.0, "life_vit": 2, "mana": 35, "mana_lvl": 2.0, "mana_ene": 2},
+	"liliana": {"name": "Liliana Vess", "role": "Necromancer. Raises the dead and curses the living.",
+		"stats": {"str": 15, "dex": 25, "vit": 15, "ene": 25}, "life": 45, "life_lvl": 1.5, "life_vit": 2, "mana": 25, "mana_lvl": 2.0, "mana_ene": 2},
+}
+const CLASS_ORDER := ["ajani", "chandra", "liliana"]
 const STAT_POINTS_PER_LEVEL := 5
 
 var level := 1
@@ -24,7 +34,8 @@ var xp := 0
 var gold := 0
 var hp := 1.0
 var mp := 1.0
-var base := BASE_STATS.duplicate()
+var cls := "ajani"
+var base: Dictionary = CLASSES.ajani.stats.duplicate()
 var stat_points := 0
 var equip := {}
 var inv: Array = []             # items with gx, gy set: their cell in the grid
@@ -62,6 +73,15 @@ func _ready() -> void:
 	lights = Game.make_light_pair(self, 820.0, Color(1.0, 0.88, 0.74), 1.15, Vector2(0, -2))
 	# a soft unshadowed fill so the hero never stands in his own darkness
 	add_child(Game.make_light(150.0, Color(1.0, 0.85, 0.7), 0.2, false, 1))
+
+
+## Become another planeswalker: a fresh level-1 hero of that class (used when the game starts).
+func set_class(c: String) -> void:
+	cls = c
+	base = CLASSES[c].stats.duplicate()
+	recalc()
+	hp = st.max_hp
+	mp = st.max_mp
 
 
 static func xp_needed(l: int) -> int:
@@ -135,8 +155,9 @@ func recalc() -> void:
 	s.block = 0
 	if sh != null:
 		s.block = clampi(roundi((sh.block + m.block) * (s.dex - 15) / float(level * 2)), 0, 75)
-	s.max_hp = roundi(55 + (level - 1) * 2 + (s.vit - 25) * 3 + m.life)
-	s.max_mp = roundi(25 + (level - 1) * 1.5 + (s.ene - 15) * 2 + m.mana)
+	var c: Dictionary = CLASSES[cls]
+	s.max_hp = roundi(c.life + (level - 1) * c.life_lvl + (s.vit - c.stats.vit) * c.life_vit + m.life)
+	s.max_mp = roundi(c.mana + (level - 1) * c.mana_lvl + (s.ene - c.stats.ene) * c.mana_ene + m.mana)
 	for e in ["fire", "cold", "lit", "pois"]:
 		s["res_" + e] = mini(75, m["res_" + e] + m.res_all)
 	var wspd: float = w.spd if w != null else 1.0
@@ -602,7 +623,7 @@ func _draw() -> void:
 
 ## The bare hero, then each worn piece over it in its own colour.
 func draw_body(c: CanvasItem) -> void:
-	var r := frame_rects("hero_base")
+	var r := frame_rects("hero_base_" + cls)
 	c.draw_texture_rect_region(r[0].tex, r[2], r[1])
 	for g in gear_layers:
 		c.draw_texture_rect_region(Game.sheet(g[0]).tex, r[2], r[1], g[1])

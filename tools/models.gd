@@ -10,8 +10,8 @@ const MONSTERS := ["scrabbler", "bonewalker", "hexcaller", "brute", "warden", "r
 	"quillback", "bone_archer", "wraith", "zealot", "reaver", "moonsister", "spitter", "thornback"]
 const TYPES := ["hero", "townsfolk", "scrabbler", "bonewalker", "hexcaller", "brute", "warden", "rotling", "gloomhound",
 	"quillback", "bone_archer", "wraith", "zealot", "reaver", "moonsister", "spitter", "thornback"]
-## Hero gear layers, in the order the game draws them over the bare body.
-const HERO_LAYERS := ["base", "boots", "armor_light", "armor_medium", "armor_heavy", "belt", "gloves",
+## Hero layers: one body per hero class, then the gear in the order the game draws it over the body.
+const HERO_LAYERS := ["base_ajani", "base_chandra", "base_liliana", "boots", "armor_light", "armor_medium", "armor_heavy", "belt", "gloves",
 	"helm_hood", "helm_cap", "helm_great", "shield_buckler", "shield_kite", "weapon_sword", "weapon_axe", "weapon_mace"]
 ## Attack animation per model.
 const STYLE := {"hero": "swing", "townsfolk": "swing", "scrabbler": "claw", "bonewalker": "swing", "hexcaller": "staff",
@@ -255,12 +255,18 @@ func _hero() -> Dictionary:
 	var r := humanoid({"arm_mat": shirt, "fore_mat": skin, "leg_mat": pants, "hand_mat": skin, "foot_mat": mat(Color(0.28, 0.2, 0.13))})
 	var t: Node3D = r.torso
 	var n: Node3D = r.neck
+	# the plain human torso and head: not baked on their own any more, but they still cut
+	# the gear layers so every hero's gear stacks the same way
+	layer = "human"
 	part(t, capsule(0.155, 0.62), Vector3(0, 0.3, 0), shirt)
 	part(n, sphere(0.11), Vector3(0, 0.13, -0.01), skin)
 	part(n, sphere(0.116, 0.85), Vector3(0, 0.17, 0.02), hair)
 	part(n, box(0.12, 0.02, 0.02), Vector3(0, 0.15, -0.115), mat(Color(0.12, 0.07, 0.05)))  # brow shadow
 	part(n, box(0.1, 0.05, 0.06), Vector3(0, 0.05, -0.08), hair)                             # beard
 	var thigh: float = r.thigh_len
+	_ajani(r)
+	_chandra(r)
+	_liliana(r)
 	# light neutral materials: the game tints each layer with the item's colour
 	var cloth := mat(Color(0.86, 0.84, 0.8), 0.95)
 	var cloth_d := mat(Color(0.6, 0.58, 0.55), 0.95)
@@ -369,6 +375,143 @@ func _hero() -> Dictionary:
 	layer = ""
 	r.scale = 1.0
 	return r
+
+
+## Covers the plain limbs of the shared skeleton with a hero's own sleeves, fur or boots.
+## bulk widens them; a null material leaves that piece bare.
+func _limbs(r: Dictionary, up_m: Material, fore_m: Material, hand_m: Material, thigh_m: Material, shin_m: Material, foot_m: Material, bulk := 1.0) -> void:
+	var thigh: float = r.thigh_len
+	for k in ["l", "r"]:
+		if up_m:
+			part(r["sh_" + k], capsule(0.066 * bulk, 0.37), Vector3(0, -0.15, 0), up_m)
+		if fore_m:
+			part(r["el_" + k], capsule(0.057 * bulk, 0.37), Vector3(0, -0.15, 0), fore_m)
+		if hand_m:
+			part(r["hand_" + k], sphere(0.068 * bulk), Vector3.ZERO, hand_m)
+		if thigh_m:
+			part(r["hip_" + k], capsule(0.077 * bulk, thigh + 0.08), Vector3(0, -thigh * 0.5, 0), thigh_m)
+		if shin_m:
+			part(r["knee_" + k], capsule(0.064 * bulk, thigh + 0.08), Vector3(0, -thigh * 0.5, 0), shin_m)
+		if foot_m:
+			part(r["knee_" + k], box(0.17 * bulk, 0.07, 0.27), Vector3(0, -thigh + 0.025, -0.05), foot_m)
+
+
+## Ajani: a white-furred lion of a man, mane, scarred eye, war harness and a tail.
+func _ajani(r: Dictionary) -> void:
+	layer = "base_ajani"
+	var fur := mat(Color(0.93, 0.9, 0.82), 0.95)
+	var fur_d := mat(Color(0.8, 0.75, 0.66), 0.95)
+	var mane := mat(Color(0.93, 0.64, 0.26), 0.95)
+	var mane_d := mat(Color(0.7, 0.42, 0.16), 0.95)
+	var leath := mat(Color(0.42, 0.27, 0.16), 0.7)
+	var gold := mat(Color(0.95, 0.75, 0.32), 0.35, 0.8)
+	var kilt := mat(Color(0.55, 0.18, 0.12), 0.9)
+	var dark := mat(Color(0.12, 0.08, 0.07), 0.6)
+	var t: Node3D = r.torso
+	var n: Node3D = r.neck
+	_limbs(r, fur, fur, fur_d, fur, fur, fur_d, 1.1)
+	# broad furred chest and belly
+	part(t, capsule(0.162, 0.64), Vector3(0, 0.31, 0), fur)
+	part(t, sphere(0.15, 0.8), Vector3(0, 0.43, -0.05), fur, Vector3.ZERO, Vector3(1.05, 1, 0.8))
+	part(t, cyl(0.17, 0.24, 0.3), Vector3(0, -0.07, 0), kilt)                      # kilt
+	part(t, box(0.13, 0.26, 0.02), Vector3(0, -0.12, -0.2), leath)                  # kilt front flap
+	# harness: a strap over the chest, a gold medallion, a leather pauldron on the left
+	part(t, box(0.06, 0.62, 0.34), Vector3(0, 0.33, 0), leath, Vector3(0, 0, 0.62), Vector3(1, 1, 1.0))
+	part(t, cyl(0.045, 0.045, 0.02), Vector3(0.0, 0.4, -0.17), gold, Vector3(PI / 2, 0, 0))
+	part(r.sh_l, sphere(0.1, 0.7), Vector3(-0.01, 0.0, 0), leath)
+	part(r.sh_l, torus(0.085, 0.105), Vector3(-0.01, -0.03, 0), gold, Vector3(0, 0, -0.3), Vector3(1, 0.5, 1))
+	part(t, torus(0.16, 0.2), Vector3(0, 0.06, 0), leath, Vector3.ZERO, Vector3(1, 0.5, 0.92))  # belt
+	for k in ["l", "r"]:
+		part(r["el_" + k], cyl(0.07, 0.066, 0.12), Vector3(0, -0.24, 0), gold)           # bracers
+	# lion head: skull, muzzle, nose, ears, amber eyes, and a scar across the left eye
+	part(n, sphere(0.24, 0.95), Vector3(0, 0.13, 0.06), mane_d)                     # mane, back
+	part(n, sphere(0.205), Vector3(0, 0.15, 0.02), mane)                           # mane
+	part(t, sphere(0.2, 0.7), Vector3(0, 0.56, 0.02), mane_d, Vector3.ZERO, Vector3(1.3, 1, 1))  # mane over the shoulders
+	part(n, torus(0.1, 0.22), Vector3(0, 0.03, 0.0), mane, Vector3(0.3, 0, 0), Vector3(1, 1.5, 1))  # ruff
+	part(n, sphere(0.112), Vector3(0, 0.15, -0.05), fur)
+	part(n, sphere(0.075, 0.8), Vector3(0, 0.1, -0.15), fur, Vector3.ZERO, Vector3(1.1, 1, 1.2))  # muzzle
+	part(n, sphere(0.03, 0.7), Vector3(0, 0.135, -0.235), dark)                    # nose
+	part(n, box(0.07, 0.012, 0.03), Vector3(0, 0.07, -0.215), dark)                # mouth
+	for s in [-1, 1]:
+		part(n, cyl(0.0, 0.045, 0.07), Vector3(0.09 * s, 0.27, -0.06), fur, Vector3(0, 0, -0.4 * s))
+		part(n, sphere(0.016), Vector3(0.045 * s, 0.18, -0.15), mat(Color(0.95, 0.65, 0.15), 0.3))
+	part(n, box(0.012, 0.11, 0.012), Vector3(-0.045, 0.18, -0.162), mat(Color(0.55, 0.14, 0.1)), Vector3(0, 0, 0.35))  # scar
+	# tail with a tuft
+	var tail := joint(r.hips, Vector3(0, 0.0, 0.17))
+	r.tail = tail
+	part(tail, capsule(0.03, 0.45), Vector3(0, -0.1, 0.18), fur, Vector3(-1.0, 0, 0))
+	part(tail, sphere(0.055, 1.3), Vector3(0, -0.24, 0.37), mane)
+
+
+## Chandra: flame-red hair, goggles pushed up, a fitted red coat, dark leggings, tall boots.
+func _chandra(r: Dictionary) -> void:
+	layer = "base_chandra"
+	var skin := mat(Color(0.86, 0.64, 0.5), 0.7)
+	var coat := mat(Color(0.78, 0.2, 0.1), 0.8)
+	var coat_d := mat(Color(0.5, 0.11, 0.07), 0.85)
+	var orange := mat(Color(1.0, 0.52, 0.12), 0.7)
+	var legs := mat(Color(0.2, 0.14, 0.13), 0.9)
+	var boot := mat(Color(0.36, 0.2, 0.12), 0.65)
+	var gold := mat(Color(0.95, 0.72, 0.3), 0.35, 0.8)
+	var t: Node3D = r.torso
+	var n: Node3D = r.neck
+	_limbs(r, coat, skin, skin, legs, boot, boot)
+	part(t, capsule(0.142, 0.6), Vector3(0, 0.31, 0), coat)
+	part(t, box(0.2, 0.2, 0.05), Vector3(0, 0.38, -0.12), orange, Vector3(0.2, 0, 0))       # bodice
+	part(t, box(0.24, 0.025, 0.24), Vector3(0, 0.26, 0), gold, Vector3.ZERO, Vector3(1, 1, 1.05))
+	part(t, cyl(0.15, 0.2, 0.26), Vector3(0, -0.05, 0), coat_d)                           # coat skirt
+	for s in [-1, 1]:
+		part(t, box(0.13, 0.36, 0.03), Vector3(0.09 * s, -0.12, 0.13), coat, Vector3(0.25, 0, 0.12 * s))  # coat tails
+		var k := "l" if s < 0 else "r"
+		part(r["sh_" + k], sphere(0.085, 0.8), Vector3(0, 0, 0), orange)                  # shoulders
+		part(r["el_" + k], cyl(0.066, 0.062, 0.16), Vector3(0, -0.21, 0), gold)          # bracers
+		part(r["knee_" + k], cyl(0.075, 0.08, 0.2), Vector3(0, -r.thigh_len + 0.13, 0), boot)
+	part(t, torus(0.14, 0.18), Vector3(0, 0.06, 0), mat(Color(0.3, 0.17, 0.1), 0.6), Vector3.ZERO, Vector3(1, 0.5, 0.92))
+	# head, goggles on the brow, and hair that rises like flame
+	part(n, sphere(0.1), Vector3(0, 0.14, -0.01), skin)
+	part(n, sphere(0.112, 0.9), Vector3(0, 0.18, 0.03), coat)
+	part(n, torus(0.09, 0.113), Vector3(0, 0.2, 0.0), mat(Color(0.25, 0.15, 0.1), 0.6), Vector3(0.25, 0, 0), Vector3(1, 0.4, 1))
+	for s in [-1, 1]:
+		part(n, cyl(0.035, 0.035, 0.03), Vector3(0.042 * s, 0.215, -0.1), gold, Vector3(1.2, 0, 0))
+		part(n, cyl(0.026, 0.026, 0.032), Vector3(0.042 * s, 0.218, -0.102), mat(Color(0.95, 0.6, 0.2), 0.1, 0.3), Vector3(1.2, 0, 0))
+	var flames := [[Vector3(0, 0.3, 0.06), Vector3(-0.5, 0, 0), 0.07, 0.24, coat], [Vector3(0.06, 0.28, 0.08), Vector3(-0.7, 0, -0.5), 0.055, 0.2, orange],
+		[Vector3(-0.06, 0.28, 0.08), Vector3(-0.7, 0, 0.5), 0.055, 0.2, orange], [Vector3(0, 0.26, 0.13), Vector3(-1.1, 0, 0), 0.06, 0.24, mat(Color(1.0, 0.72, 0.2), 0.7)],
+		[Vector3(0.08, 0.22, 0.04), Vector3(-0.2, 0, -0.9), 0.045, 0.16, coat], [Vector3(-0.08, 0.22, 0.04), Vector3(-0.2, 0, 0.9), 0.045, 0.16, coat]]
+	for f in flames:
+		part(n, cyl(0.0, f[2] * 1.3, f[3] * 1.5), f[0] + Vector3(0, f[3] * 0.2, 0), f[4], f[1])
+
+
+## Liliana: pale, long black hair, a violet gown with gold, and the Chain Veil over her brow.
+func _liliana(r: Dictionary) -> void:
+	layer = "base_liliana"
+	var skin := mat(Color(0.88, 0.8, 0.76), 0.65)
+	var gown := mat(Color(0.33, 0.13, 0.38), 0.8)
+	var gown_d := mat(Color(0.18, 0.07, 0.22), 0.85)
+	var hair := mat(Color(0.07, 0.06, 0.08), 0.8)
+	var gold := mat(Color(0.92, 0.74, 0.34), 0.3, 0.85)
+	var t: Node3D = r.torso
+	var n: Node3D = r.neck
+	_limbs(r, gown, skin, skin, gown_d, gown_d, gown_d)
+	part(t, capsule(0.14, 0.6), Vector3(0, 0.31, 0), gown)
+	part(t, box(0.16, 0.24, 0.03), Vector3(0, 0.36, -0.13), gown_d, Vector3(0.15, 0, 0))
+	part(t, torus(0.13, 0.165), Vector3(0, 0.08, 0), gold, Vector3.ZERO, Vector3(1, 0.5, 0.92))
+	part(t, cyl(0.16, 0.34, 0.86), Vector3(0, -0.4, 0.01), gown)                         # gown to the ground
+	part(t, cyl(0.33, 0.35, 0.06), Vector3(0, -0.8, 0.01), gown_d)                        # hem
+	part(t, box(0.05, 0.8, 0.02), Vector3(0, -0.38, -0.25), gold, Vector3(-0.2, 0, 0))   # gold seam
+	for s in [-1, 1]:
+		part(t, box(0.03, 0.36, 0.16), Vector3(0.15 * s, 0.6, 0.06), gown_d, Vector3(0.2, 0, -0.3 * s))  # high collar
+		var k := "l" if s < 0 else "r"
+		part(r["sh_" + k], sphere(0.08, 0.7), Vector3.ZERO, gown_d)
+		part(r["el_" + k], cyl(0.06, 0.09, 0.2), Vector3(0, -0.22, 0), gown)                # bell sleeves
+	# head, hair falling down her back, the Chain Veil: a gold band with hanging links
+	part(n, sphere(0.098), Vector3(0, 0.14, -0.01), skin)
+	part(n, sphere(0.11, 0.95), Vector3(0, 0.17, 0.025), hair)
+	part(n, box(0.2, 0.4, 0.06), Vector3(0, -0.04, 0.09), hair, Vector3(0.12, 0, 0))
+	part(n, torus(0.098, 0.112), Vector3(0, 0.2, 0.0), gold, Vector3(0.2, 0, 0), Vector3(1, 0.35, 1))
+	for i in 7:
+		var a := (i - 3) * 0.32
+		part(n, box(0.012, 0.075, 0.012), Vector3(sin(a) * 0.1, 0.15, -cos(a) * 0.1 - 0.005), gold)
+	part(n, sphere(0.022), Vector3(0, 0.215, -0.11), mat(Color(0.6, 0.1, 0.5), 0.2, 0.3))
 
 
 ## Plain villager for the town: a long coat and a hood, tinted per person in game.

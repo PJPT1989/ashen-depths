@@ -16,6 +16,7 @@ const RANK_TINTS := [Color(1, 1, 1), Color(0.6, 0.8, 0.35), Color(1, 0.7, 0.3), 
 	Color(1, 0.45, 0.15), Color(0.55, 1, 1)]
 
 var muted := false
+var hero_class := "ajani"   # the planeswalker picked on the title screen
 ## Graphics quality, cycled with L and saved in user://settings.cfg:
 ## LOW (slow computers): no shadows, one light instead of each shadowed pair, no monster glow
 ##   lights or normal maps, a cheap finishing pass and no drifting embers.
@@ -176,11 +177,11 @@ func _radial_texture(size: int, offsets: Array, colors: Array) -> GradientTextur
 
 
 ## Baked character sheets (see tools/bake_sprites.gd). Cell sizes must match the baker.
-## The hero is drawn from layers: "hero_base" plus one sheet per piece of gear.
+## The hero is drawn from layers: "hero_base_<class>" plus one sheet per piece of gear.
 const SPRITE_CELLS := {"hero": 112, "townsfolk": 96, "scrabbler": 80, "bonewalker": 112, "hexcaller": 112, "brute": 144,
 	"warden": 160, "rotling": 112, "gloomhound": 112, "quillback": 96, "bone_archer": 112, "wraith": 112,
 	"zealot": 128, "reaver": 128, "moonsister": 112, "spitter": 112, "thornback": 144}
-const HERO_LAYERS := ["base", "boots", "armor_light", "armor_medium", "armor_heavy", "belt", "gloves", "helm_hood", "helm_cap",
+const HERO_LAYERS := ["base_ajani", "base_chandra", "base_liliana", "boots", "armor_light", "armor_medium", "armor_heavy", "belt", "gloves", "helm_hood", "helm_cap",
 	"helm_great", "shield_buckler", "shield_kite", "weapon_sword", "weapon_axe", "weapon_mace"]
 const SPRITE_ANIMS := ["idle", "walk", "attack", "death", "cast"]
 const SPRITE_ANCHOR_Y := 0.8

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://du7m6avaao4dy"
-path="res://.godot/imported/hero_base_color.png-58078b847c72410fa66a8dd146e11eeb.ctex"
+uid="uid://d1kyo6r46owdk"
+path="res://.godot/imported/hero_base_chandra_color.png-696b33765897242f16395f4698c5a665.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://sprites/hero_base_color.png"
-dest_files=["res://.godot/imported/hero_base_color.png-58078b847c72410fa66a8dd146e11eeb.ctex"]
+source_file="res://sprites/hero_base_chandra_color.png"
+dest_files=["res://.godot/imported/hero_base_chandra_color.png-696b33765897242f16395f4698c5a665.ctex"]
 
 [params]
 

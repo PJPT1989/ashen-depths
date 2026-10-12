@@ -4,14 +4,17 @@ extends SceneTree
 ##   godot --path . --rendering-driver opengl3 --script res://tools/bake_sprites.gd
 ##   add  -- --preview          to render stills of every model into sprites/preview.png instead
 ##   add  -- --only=hero,brute  to bake (or preview) just some models
+##   add  -- --layers=base_ajani,boots  to bake just some hero layers
+##   preview "hero:ajani+armor_heavy+weapon_axe" for one hero body with some gear on
 ##
 ## For each monster it writes three sheets into sprites/:
 ##   <type>_color.png   lit color
 ##   <type>_normal.png  view-space normals for Godot's 2D lights
 ##   <type>_glow.png    eyes, orbs and other glowing parts (drawn additively in game;
 ##                      tools/finish_glow.py turns its brightness into alpha afterwards)
-## The hero is baked once per gear layer (hero_<layer>_color.png and _normal.png). Each layer
-## is rendered with the bare body as a hold-out: wherever the body is in front of the gear,
+## The hero is baked once per layer (hero_<layer>_color.png and _normal.png): a body for each
+## hero class (base_ajani, ...), then each piece of gear. Each gear layer
+## is rendered with a plain human body as a hold-out: wherever the body is in front of the gear,
 ## the gear is cut away, so the game can stack layers over the body in a fixed order.
 ## Layout: columns are frames, rows are (animation * 8 + direction). Direction d faces
 ## screen angle d * 45 degrees (0 = right, 2 = down/toward camera).
@@ -26,7 +29,7 @@ const CELLS := {"hero": 112, "townsfolk": 96, "scrabbler": 80, "bonewalker": 112
 const ANCHOR_Y := 0.8      # feet sit at this fraction of the cell height
 ## Gear that is held away from the body is also cut by the mid-weight armour, so a sword
 ## behind the back doesn't show through the torso.
-const HOLDOUT := {"weapon": ["base", "armor_medium"], "shield": ["base", "armor_medium"]}
+const HOLDOUT := {"weapon": ["base", "human", "armor_medium"], "shield": ["base", "human", "armor_medium"]}
 
 var models := Models.new()
 var vp: SubViewport
@@ -175,8 +178,11 @@ func _apply_pass(n: Node, pass_name: String, layer: String) -> void:
 		n.visible = true
 		if layer != "":
 			var lay: String = models.layer_of.get(n, "base")
-			var cut: Array = [] if layer == "base" else HOLDOUT.get(layer.split("_")[0], ["base"])
-			if lay != layer:
+			# a hero body (base_<class>) is drawn over the shared limbs; gear is cut by the
+			# plain human body so it stacks the same way on every hero
+			var body := layer.begins_with("base")
+			var cut: Array = [] if body else HOLDOUT.get(layer.split("_")[0], ["base", "human"])
+			if lay != layer and not (body and lay == "base"):
 				mine = false
 				if lay in cut:
 					n.material_override = holdout_mat
@@ -229,6 +235,13 @@ func _bake(type: String, layer: String) -> void:
 	print("baked %s: %d x %d, %d rows" % [name, frames * cell, rows * cell, rows])
 
 
+func _show_layers(n: Node, show: Array) -> void:
+	if n is MeshInstance3D:
+		n.visible = models.layer_of.get(n, "base") in show
+	for c in n.get_children():
+		_show_layers(c, show)
+
+
 ## One still per model (idle, attack, walk) on a grey ground, for checking models quickly.
 func _preview(types: Array) -> void:
 	var cell := 176 * SS
@@ -237,9 +250,18 @@ func _preview(types: Array) -> void:
 	_clear()
 	var i := 0
 	for type in types:
-		_place(type, (i + 0.5) * cell, 0.85 * cell, PI / 2 - PI / 4, "idle", 0.0)
-		_place(type, (i + 0.5) * cell, 1.85 * cell, PI / 4, "attack", 0.45)
-		_place(type, (i + 0.5) * cell, 2.85 * cell, 0.0, "walk", 0.25)
+		# "hero:ajani+boots+weapon_axe" previews one hero body with some gear on
+		var parts: Array = Array(type.split(":"))
+		var model: String = parts[0]
+		var show: Array = []
+		if parts.size() > 1:
+			show = Array(parts[1].split("+"))
+			show[0] = "base_" + show[0]
+			show.append("base")
+		for row in [[0.85, PI / 2 - PI / 4, "idle", 0.0], [1.85, PI / 4, "attack", 0.45], [2.85, 0.0, "walk", 0.25]]:
+			var r := _place(model, (i + 0.5) * cell, row[0] * cell, row[1], row[2], row[3])
+			if not show.is_empty():
+				_show_layers(r.root, show)
 		i += 1
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw

@@ -53,6 +53,7 @@ var tip_text: RichTextLabel
 var held_view: HeldView
 var automap: Automap
 var title_screen: Control
+var char_title: Label
 var dead_screen: Control
 
 
@@ -320,7 +321,7 @@ func _build_character() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 6)
 	char_panel.add_child(v)
-	_panel_head(v, "The Wanderer", func(): toggle_char(false))
+	char_title = _panel_head(v, "", func(): toggle_char(false))
 	char_head = _label("", 15, BONE)
 	v.add_child(char_head)
 	char_xp = _label("", 13, MUTED)
@@ -363,6 +364,7 @@ func _build_character() -> void:
 func _refresh_character() -> void:
 	var p: Player = main.player
 	var s: Dictionary = p.st
+	char_title.text = Player.CLASSES[p.cls].name
 	char_head.text = "Level %d" % p.level
 	char_xp.text = "Experience %d / %d" % [p.xp, Player.xp_needed(p.level)]
 	for k in STAT_NAMES:
@@ -580,9 +582,9 @@ func _build_title() -> Control:
 	o.add_child(center)
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_theme_constant_override("separation", 14)
+	v.add_theme_constant_override("separation", 10)
 	center.add_child(v)
-	var t := _label("Ashen Depths", 104, EMBER, Game.font_display)
+	var t := _label("Ashen Depths", 84, EMBER, Game.font_display)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	t.add_theme_color_override("font_shadow_color", Color("2a0c04"))
 	t.add_theme_constant_override("shadow_offset_y", 4)
@@ -594,8 +596,9 @@ func _build_title() -> Control:
 	lore.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(lore)
 	var keys := GridContainer.new()
-	keys.columns = 2
+	keys.columns = 4
 	keys.add_theme_constant_override("h_separation", 18)
+	keys.add_theme_constant_override("v_separation", 2)
 	var kc := CenterContainer.new()
 	kc.add_child(keys)
 	v.add_child(kc)
@@ -608,12 +611,15 @@ func _build_title() -> Control:
 	var goal := _label("Cross the eight areas of Act I. Each one ends with a boss who seals the way on.", 16)
 	goal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(goal)
-	var go := _big_button("Begin", func():
-		title_screen.visible = false
-		main.start_game())
-	var bc := CenterContainer.new()
-	bc.add_child(go)
-	v.add_child(bc)
+	var pick := _label("Choose your planeswalker", 26, GOLD, Game.font_display)
+	pick.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(pick)
+	var heroes := HBoxContainer.new()
+	heroes.alignment = BoxContainer.ALIGNMENT_CENTER
+	heroes.add_theme_constant_override("separation", 18)
+	v.add_child(heroes)
+	for c in Player.CLASS_ORDER:
+		heroes.add_child(_hero_card(c))
 	var q := _button("", func(): Game.set_quality((Game.quality + 1) % 3))
 	q.add_theme_font_size_override("font_size", 14)
 	q.add_theme_color_override("font_color", MUTED)
@@ -633,7 +639,7 @@ func _build_dead() -> Control:
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	o.add_child(center)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 14)
+	v.add_theme_constant_override("separation", 10)
 	center.add_child(v)
 	var t := _label("You have fallen", 84, Color("c22a2a"), Game.font_display)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -647,6 +653,55 @@ func _build_dead() -> Control:
 		main.revive()))
 	v.add_child(bc)
 	return o
+
+
+## One planeswalker on the title screen: a picture from the baked sheet, name, role and
+## starting attributes. Clicking it starts the game as that hero.
+func _hero_card(c: String) -> Button:
+	var d: Dictionary = Player.CLASSES[c]
+	var b := _button("", func():
+		title_screen.visible = false
+		main.start_game(c))
+	b.custom_minimum_size = Vector2(250, 262)
+	var n := _box(Color("1d0f0c"), Color("6b3a22"))
+	var h := _box(Color("3a160b"), Color("c8653a"))
+	b.add_theme_stylebox_override("normal", n)
+	b.add_theme_stylebox_override("hover", h)
+	b.add_theme_stylebox_override("pressed", h)
+	var v := VBoxContainer.new()
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.offset_left = 10
+	v.offset_right = -10
+	v.offset_top = 6
+	v.offset_bottom = -10
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_theme_constant_override("separation", 4)
+	b.add_child(v)
+	# idle frame facing the camera (row 2), cropped to the figure
+	var cell: int = Game.SPRITE_CELLS.hero
+	var at := AtlasTexture.new()
+	at.atlas = load("res://sprites/hero_base_%s_color.png" % c)
+	at.region = Rect2(cell * 0.2, 2 * cell + cell * 0.12, cell * 0.6, cell * 0.74)
+	var pic := TextureRect.new()
+	pic.texture = at
+	pic.custom_minimum_size = Vector2(0, 140)
+	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	pic.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(pic)
+	var name := _label(d.name, 26, EMBER, Game.font_display)
+	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(name)
+	var role := _label(d.role, 14, Color("c9b99a"))
+	role.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	role.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(role)
+	var st: Dictionary = d.stats
+	var stats := _label("Str %d · Dex %d · Vit %d · Ene %d" % [st.str, st.dex, st.vit, st.ene], 13, MUTED)
+	stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(stats)
+	return b
 
 
 func _big_button(text: String, cb: Callable) -> Button:

@@ -328,7 +328,9 @@ func spawn_monster(type: String, at: Vector2, rank: int, role := "normal") -> Mo
 	return m
 
 
-func start_game() -> void:
+func start_game(cls: String = Game.hero_class) -> void:
+	Game.hero_class = cls
+	player.set_class(cls)
 	state = "play"
 	show_msg("Mirewatch", "Speak with Elder Maelis, then take the north gate into the Blackwater Fen.", 5.0)
 

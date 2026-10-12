@@ -17,10 +17,21 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--shots="):
 			shots_dir = a.substr(8)
-	main.hud.title_screen.visible = false
-	main.start_game()
 	steps = [
-		[1.5, func():
+		[1.0, func(): _shot("title")],
+		[0.3, func():
+			main.hud.title_screen.visible = false
+			main.start_game("chandra")],
+		[0.6, func():
+			print("AUTOTEST hero %s: life %d, mana %d" % [main.player.cls, main.player.st.max_hp, main.player.st.max_mp])
+			_shot("hero_chandra")],
+		[0.3, func(): main.player.set_class("liliana")],
+		[0.6, func():
+			print("AUTOTEST hero %s: life %d, mana %d" % [main.player.cls, main.player.st.max_hp, main.player.st.max_mp])
+			_shot("hero_liliana")],
+		[0.3, func(): main.player.set_class("ajani")],
+		[1.0, func():
+			print("AUTOTEST hero %s: life %d, mana %d" % [main.player.cls, main.player.st.max_hp, main.player.st.max_mp])
 			print("AUTOTEST town fps %d, nodes %d" % [Engine.get_frames_per_second(), get_tree().get_node_count()])
 			_shot("town")],
 		[0.5, func(): _fill_inventory()],

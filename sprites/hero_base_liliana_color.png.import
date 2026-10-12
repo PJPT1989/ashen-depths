@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c7cdos0363c1f"
-path="res://.godot/imported/hero_base_normal.png-498713cc816a1c465a5b3348395d2a22.ctex"
+uid="uid://sff0kymgpmfc"
+path="res://.godot/imported/hero_base_liliana_color.png-1718ef1de2aa076b6513b17c5997a01c.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://sprites/hero_base_normal.png"
-dest_files=["res://.godot/imported/hero_base_normal.png-498713cc816a1c465a5b3348395d2a22.ctex"]
+source_file="res://sprites/hero_base_liliana_color.png"
+dest_files=["res://.godot/imported/hero_base_liliana_color.png-1718ef1de2aa076b6513b17c5997a01c.ctex"]
 
 [params]
 
