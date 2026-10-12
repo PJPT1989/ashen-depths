@@ -36,6 +36,7 @@ var font_body: Font
 var font_bold: Font
 var sounds := {}
 var soft_dot: Texture2D            # white radial blob for particles, glows and shadows
+var prop_atlas: Texture2D          # soft dot, solid disc and plain white in one texture (Prop)
 var add_material: CanvasItemMaterial  # additive and unaffected by lights (fire, sparks)
 var _players: Array[AudioStreamPlayer] = []
 var _next_player := 0
@@ -47,6 +48,7 @@ func _ready() -> void:
 	font_body = load("res://fonts/AlegreyaSans-Regular.ttf")
 	font_bold = load("res://fonts/AlegreyaSans-Bold.ttf")
 	soft_dot = _radial_texture(64, [0.0, 1.0], [Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
+	prop_atlas = _prop_atlas()
 	add_material = CanvasItemMaterial.new()
 	add_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	add_material.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
@@ -219,6 +221,43 @@ func canvas_tex(name: String) -> CanvasTexture:
 		t.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 		_tex_cache[name] = t
 	return _tex_cache[name]
+
+
+## Godot 4.3 keeps the texture of the first triangle primitive in a batch for all the following
+## ones, even from the next canvas item. An invisible rect with the new texture starts a fresh batch,
+## so call this before a run of primitives with a texture different from the previous run.
+func begin_batch(ci: CanvasItem, tex: Texture2D) -> void:
+	if tex:
+		ci.draw_texture_rect(tex, Rect2(0, 0, 1, 1), false, Color(0, 0, 0, 0))
+	else:
+		ci.draw_rect(Rect2(0, 0, 1, 1), Color(0, 0, 0, 0))
+
+
+## 128 x 64: a soft dot (left half, like soft_dot), a solid disc (right half) whose middle is plain
+## white. Props draw everything from it as triangles, so one prop is one batch.
+func _prop_atlas() -> Texture2D:
+	var img := Image.create(128, 64, false, Image.FORMAT_RGBA8)
+	for y in 64:
+		for x in 64:
+			var d := Vector2(x + 0.5 - 32.0, y + 0.5 - 32.0).length()
+			img.set_pixel(x, y, Color(1, 1, 1, clampf(1.0 - d / 32.0, 0.0, 1.0)))
+			img.set_pixel(x + 64, y, Color(1, 1, 1, clampf(31.0 - d, 0.0, 1.0)))
+	return ImageTexture.create_from_image(img)
+
+
+## Draws a convex quad as two triangle primitives, which Godot batches with neighbours using
+## the same texture; draw_polygon is one draw call each. (A 4-point draw_primitive doesn't come
+## out as a quad in Godot 4.3, so it's split here.) Call begin_batch first: see there.
+func quad(ci: CanvasItem, pts: PackedVector2Array, col: Color, uvs := PackedVector2Array(), tex: Texture2D = null) -> void:
+	var cs := PackedColorArray([col, col, col])
+	var a := PackedVector2Array([pts[0], pts[1], pts[2]])
+	var b := PackedVector2Array([pts[0], pts[2], pts[3]])
+	if uvs.is_empty():
+		ci.draw_primitive(a, cs, uvs, tex)
+		ci.draw_primitive(b, cs, uvs, tex)
+	else:
+		ci.draw_primitive(a, cs, PackedVector2Array([uvs[0], uvs[1], uvs[2]]), tex)
+		ci.draw_primitive(b, cs, PackedVector2Array([uvs[0], uvs[2], uvs[3]]), tex)
 
 
 ## Recolours a monster by rank: keeps its shading but pulls its hue toward the rank colour.

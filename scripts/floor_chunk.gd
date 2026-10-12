@@ -10,6 +10,12 @@ var rect := Rect2i()
 func _draw() -> void:
 	var dg := dungeon
 	var col := dg.tint
+	# Tiles are triangle primitives (Game.quad), grouped by texture so Godot batches each group
+	# into a few draw calls; water and decoration come after.
+	var floor_tiles := []
+	var path_tiles := []
+	var water := []
+	var decor := []
 	for j in range(rect.position.y, mini(rect.end.y, dg.H)):
 		for i in range(rect.position.x, mini(rect.end.x, dg.W)):
 			var k := dg.idx(i, j)
@@ -19,25 +25,40 @@ func _draw() -> void:
 			if not dg.outdoor and dg.seen[k] == 0:
 				continue
 			var s := Game.iso(Vector2(i, j))
-			var pts := PackedVector2Array([s, s + Vector2(Game.HW, Game.HH), s + Vector2(0, Game.TH), s + Vector2(-Game.HW, Game.HH)])
 			var v := dg.shade[k]
 			if g == Dungeon.GROUND_WATER:
-				var wc := Color(0.08, 0.13, 0.17).lerp(Color(0.12, 0.18, 0.22), v)
-				draw_colored_polygon(pts, wc)
-				if v > 0.7:
-					draw_line(s + Vector2(-10, Game.HH + 2), s + Vector2(8, Game.HH + 2), Color(0.5, 0.6, 0.7, 0.25), 1.0)
+				water.append([s, Color(0.08, 0.13, 0.17).lerp(Color(0.12, 0.18, 0.22), v), v])
 				continue
-			var tex: CanvasTexture = dg.path_tex if g == Dungeon.GROUND_PATH else dg.floor_tex
 			var variant := 3 if v < 0.08 else (2 if v > 0.84 else (k * 7 + j) % 2)
-			var u0 := variant * 0.25
-			var uvs := PackedVector2Array([Vector2(u0, 0), Vector2(u0 + 0.25, 0), Vector2(u0 + 0.25, 1), Vector2(u0, 1)])
 			var c := col * (0.85 + v * 0.3)
 			if g == Dungeon.GROUND_DARK:
 				c = col * (0.35 + v * 0.1)
 			c.a = 1.0
-			draw_polygon(pts, PackedColorArray([c, c, c, c]), uvs, tex)
+			(path_tiles if g == Dungeon.GROUND_PATH else floor_tiles).append([s, variant * 0.25, c])
 			if g != Dungeon.GROUND_DARK:
-				_decor(i, j, s + Vector2(0, Game.HH), v, dg)
+				decor.append([i, j, s + Vector2(0, Game.HH), v])
+	Game.begin_batch(self, dg.floor_tex)
+	for t in floor_tiles:
+		_tile(t, dg.floor_tex)
+	Game.begin_batch(self, dg.path_tex)
+	for t in path_tiles:
+		_tile(t, dg.path_tex)
+	Game.begin_batch(self, null)
+	for w in water:
+		var s: Vector2 = w[0]
+		Game.quad(self, PackedVector2Array([s, s + Vector2(Game.HW, Game.HH), s + Vector2(0, Game.TH), s + Vector2(-Game.HW, Game.HH)]), w[1])
+	for w in water:
+		if w[2] > 0.7:
+			draw_line(w[0] + Vector2(-10, Game.HH + 2), w[0] + Vector2(8, Game.HH + 2), Color(0.5, 0.6, 0.7, 0.25), 1.0)
+	for d in decor:
+		_decor(d[0], d[1], d[2], d[3], dg)
+
+
+func _tile(t: Array, tex: Texture2D) -> void:
+	var top: Vector2 = t[0]
+	var u0: float = t[1]
+	Game.quad(self, PackedVector2Array([top, top + Vector2(Game.HW, Game.HH), top + Vector2(0, Game.TH), top + Vector2(-Game.HW, Game.HH)]), t[2],
+		PackedVector2Array([Vector2(u0, 0), Vector2(u0 + 0.25, 0), Vector2(u0 + 0.25, 1), Vector2(u0, 1)]), tex)
 
 
 ## Scattered detail so the ground doesn't read as repeated tiles.
