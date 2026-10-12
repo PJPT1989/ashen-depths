@@ -317,8 +317,8 @@ const FIRE_COLORS := [Color(1, 0.95, 0.7, 1), Color(1, 0.6, 0.15, 0.9), Color(0.
 
 func _register_inputs() -> void:
 	var keys := {
-		"drink_heal": [KEY_1, KEY_Q], "drink_mana": [KEY_2, KEY_W],
-		"cast_fire": [KEY_F], "cast_nova": [KEY_SPACE],
+		"drink_heal": [KEY_Q], "drink_mana": [KEY_W],
+		"skill_1": [KEY_1], "skill_2": [KEY_2], "skill_3": [KEY_3], "skill_4": [KEY_4], "toggle_skills": [KEY_S, KEY_K],
 		"toggle_inv": [KEY_I, KEY_B], "toggle_char": [KEY_C, KEY_A], "toggle_map": [KEY_TAB],
 		"town_portal": [KEY_T], "toggle_sound": [KEY_M], "toggle_quality": [KEY_L], "close": [KEY_ESCAPE],
 	}

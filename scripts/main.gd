@@ -36,6 +36,8 @@ var state := "title"      # title | play | dead
 var area := 0
 var player: Player
 var monsters: Array = []
+var minions: Array = []       # creatures fighting for the hero (Minion)
+var corpses: Array = []       # dead monsters still lying where they fell
 var drops: Array = []
 var objects: Array = []   # Interactables in this area
 var boss: Monster = null
@@ -89,6 +91,9 @@ func _ready() -> void:
 func new_game() -> void:
 	if player:
 		player.queue_free()
+	for mi in minions:
+		mi.queue_free()
+	minions.clear()
 	area_seeds.clear()
 	area_state.clear()
 	for i in Act.count():
@@ -130,6 +135,9 @@ func load_area(i: int, arrive: String) -> void:
 	for m in monsters:
 		m.queue_free()
 	monsters.clear()
+	for c in corpses:
+		c.queue_free()
+	corpses.clear()
 	for o in objects:
 		o.queue_free()
 	objects.clear()
@@ -139,7 +147,10 @@ func load_area(i: int, arrive: String) -> void:
 	floor_fx.decals.clear()
 	floor_fx.rings.clear()
 	for c in world.get_children():
-		if c is Projectile:
+		if c is Projectile or (c is Monster and c.dead):
+			c.queue_free()
+	for c in get_children() + flat.get_children():
+		if c is SkillFx:
 			c.queue_free()
 	hovered_monster = null
 	hovered_drop = null
@@ -169,6 +180,8 @@ func load_area(i: int, arrive: String) -> void:
 	var keep := ["townsfolk"]
 	for m in monsters:
 		keep.append(m.kind)
+	for mi in minions:
+		keep.append(mi.kind)
 	Game.trim_sheets(keep)
 	match arrive:
 		"start":
@@ -183,6 +196,14 @@ func load_area(i: int, arrive: String) -> void:
 		"town_tp":
 			player.wpos = dungeon.spot_near(dungeon.waypoint + Vector2(0, 2.5), 0.6)
 	player.path.clear()
+	player.lunge = {}
+	player.body.position = Vector2.ZERO
+	for mi in minions:
+		mi.dungeon = dungeon
+		mi.wpos = dungeon.spot_near(player.wpos + Vector2(randf_range(-1.5, 1.5), randf_range(-1.5, 1.5)), 0.4)
+		mi.path.clear()
+		mi.target = null
+		mi.sync_position()
 	player.target_monster = null
 	player.target_drop = null
 	player.target_obj = null
@@ -504,8 +525,8 @@ func burst(at: Vector2, color: Color, n: int, speed := 2.5, z := 14.0, life := 0
 	particles.burst(at, color, n, speed, z, life, size)
 
 
-func add_ring(at: Vector2, max_radius: float, life: float, click_mark: bool) -> void:
-	floor_fx.rings.append([at, max_radius, life, life, click_mark])
+func add_ring(at: Vector2, max_radius: float, life: float, click_mark: bool, color := Color(0.63, 0.82, 1.0)) -> void:
+	floor_fx.rings.append([at, max_radius, life, life, click_mark, color])
 
 
 func flash(at: Vector2) -> void:
@@ -541,7 +562,7 @@ func hit_stop(duration: float) -> void:
 
 func no_mana() -> void:
 	if no_mana_timer <= 0.0:
-		floater(player.wpos, "Not enough mana", Color("8ea4ff"))
+		floater(player.wpos, "Not enough %s" % Skills.RESOURCE[player.cls].name, Color("8ea4ff"))
 		no_mana_timer = 1.0
 
 
@@ -551,9 +572,12 @@ func spawn_shot(src, kind: String, at: Vector2, vel: Vector2, dmg: Array, elem: 
 	world.add_child(p)
 
 
-func damage_monster(m: Monster, dmg: int, color: Color) -> void:
+## Returns the damage actually dealt (curses that make a monster vulnerable add to it).
+func damage_monster(m: Monster, dmg: int, color: Color) -> int:
 	if m.dead:
-		return
+		return 0
+	if m.vuln_t > 0.0:
+		dmg = roundi(dmg * (1.0 + m.vuln / 100.0))
 	m.hp -= dmg
 	m.hit = 0.12
 	if not m.aggro:
@@ -561,6 +585,7 @@ func damage_monster(m: Monster, dmg: int, color: Color) -> void:
 	floater(m.wpos, str(dmg), color)
 	if m.hp <= 0:
 		kill_monster(m)
+	return dmg
 
 
 func kill_monster(m: Monster) -> void:
@@ -586,6 +611,7 @@ func kill_monster(m: Monster) -> void:
 	if hovered_monster == m:
 		hovered_monster = null
 	player.gain_xp(m.xp)
+	player.on_kill(m)
 	_drop_loot(m)
 	if m.uid != "":
 		area_state[area].killed[m.uid] = true
@@ -692,9 +718,42 @@ func show_msg(title: String, sub: String, dur := 3.0) -> void:
 
 
 func _on_level_up(level: int) -> void:
-	var extra := " You learned Frost Nova: press Space." if level == 3 else ""
-	show_msg("Level %d" % level, "5 new stat points: press C to spend them.%s" % extra, 3.5)
+	var learned: Array = []
+	for id in Skills.of_hero(player.cls):
+		if Skills.SKILLS[id].lvl == level:
+			learned.append(Skills.SKILLS[id].name)
+		for r in Skills.SKILLS[id].runes:
+			if r.lvl == level:
+				learned.append("%s rune for %s" % [r.name, Skills.SKILLS[id].name])
+	for id in Skills.passives_of(player.cls):
+		if Skills.PASSIVES[id].lvl == level:
+			learned.append("passive " + Skills.PASSIVES[id].name)
+	if level in Skills.PASSIVE_SLOTS:
+		learned.append("a passive slot")
+	var extra := ""
+	if not learned.is_empty():
+		extra = "\nNew: %s. Press S to set your skills." % ", ".join(learned)
+	show_msg("Level %d" % level, "5 new stat points: press C to spend them.%s" % extra, 4.5)
 	hud.refresh()
+
+
+## A dead monster now lies as a corpse; only the newest 60 are kept.
+func add_corpse(m: Monster) -> void:
+	corpses.append(m)
+	if corpses.size() > 60:
+		corpses.pop_front().queue_free()
+
+
+func remove_corpse(m: Monster) -> void:
+	corpses.erase(m)
+	m.queue_free()
+
+
+## Up to n corpses within r of a point, nearest first.
+func corpses_near(at: Vector2, r: float, n: int) -> Array:
+	var list := corpses.filter(func(c): return c.wpos.distance_to(at) <= r)
+	list.sort_custom(func(a, b): return a.wpos.distance_to(at) < b.wpos.distance_to(at))
+	return list.slice(0, n)
 
 
 # ---------- input ----------
@@ -717,15 +776,21 @@ func _unhandled_input(event: InputEvent) -> void:
 				hold_timer = 0.2
 				_primary_click()
 		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-			player.cast_fire(mouse_world())
+			use_slot(1)
 	elif event.is_action_pressed("drink_heal"):
 		player.drink("hp")
 	elif event.is_action_pressed("drink_mana"):
 		player.drink("mp")
-	elif event.is_action_pressed("cast_fire"):
-		player.cast_fire(mouse_world())
-	elif event.is_action_pressed("cast_nova"):
-		player.cast_nova()
+	elif event.is_action_pressed("skill_1"):
+		use_slot(2)
+	elif event.is_action_pressed("skill_2"):
+		use_slot(3)
+	elif event.is_action_pressed("skill_3"):
+		use_slot(4)
+	elif event.is_action_pressed("skill_4"):
+		use_slot(5)
+	elif event.is_action_pressed("toggle_skills"):
+		hud.toggle_skills()
 	elif event.is_action_pressed("toggle_inv"):
 		hud.toggle_inv()
 	elif event.is_action_pressed("toggle_char"):
@@ -742,6 +807,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		floater(player.wpos, "%s quality" % Game.QUALITY_NAMES[Game.quality], Color("bbbbbb"))
 	elif event.is_action_pressed("close"):
 		hud.close_panels()
+
+
+## Use a hotbar skill at the cursor, on the monster under it if there is one.
+func use_slot(i: int) -> void:
+	_update_hover()
+	player.use_slot(i, hovered_monster.wpos if hovered_monster else mouse_world(), hovered_monster)
 
 
 func _primary_click() -> void:
@@ -896,6 +967,12 @@ func _separate() -> void:
 		var mp := a.radius + player.radius
 		if lp < mp and lp > 0.001:
 			a.move_by(dp / lp * (mp - lp))
+		for mi in minions:
+			var dm: Vector2 = mi.wpos - a.wpos
+			var lm := dm.length()
+			var md: float = a.radius + mi.radius
+			if lm < md and lm > 0.001:
+				mi.move_by(dm / lm * (md - lm))
 
 
 ## Fade walls, trees and other tall things that stand between the camera and the hero.

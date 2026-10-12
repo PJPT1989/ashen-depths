@@ -50,6 +50,35 @@ func _ready() -> void:
 		[18.5, func():
 			print("AUTOTEST moor fight: level %d, xp %d, gold %d, monsters left %d, drops %d" % [main.player.level, main.player.xp, main.player.gold, main.monsters.size(), main.drops.size()])
 			_shot("moor")],
+		[0.2, func(): _kill_some(6)],
+		[1.2, func():
+			_skill_test("ajani")
+			_shot("skills_ajani")],
+		[0.2, func(): _kill_some(6)],
+		[1.2, func():
+			_skill_test("chandra")
+			_shot("skills_chandra")],
+		[0.2, func(): _kill_some(6)],
+		[1.2, func():
+			_skill_test("liliana")
+			_shot("skills_liliana")],
+		[0.3, func(): _showcase("chandra", ["fireblast", "chain_lightning", "flame_slash"])],
+		[0.45, func(): _shot("showcase_chandra")],
+		[0.3, func(): _showcase("liliana", ["death_cloud", "army_of_the_damned", "bone_splinters"])],
+		[0.6, func(): _shot("showcase_liliana")],
+		[0.3, func(): _showcase("ajani", ["day_of_judgment"])],
+		[0.25, func(): _shot("showcase_ajani")],
+		[1.5, func(): main.hud.toggle_skills(true)],
+		[0.6, func(): _shot("skills_panel")],
+		[0.3, func():
+			print("AUTOTEST minions: %d, corpses %d" % [main.minions.size(), main.corpses.size()])
+			main.hud.close_panels()
+			var p: Player = main.player
+			p.set_class("ajani")
+			p.level = 12
+			p.base.str = 60
+			p.base.dex = 45
+			p.recalc()],
 		[0.2, func(): Game.set_quality(Game.LOW)],
 		[0.8, func():
 			var pairs := get_tree().get_nodes_in_group("light_pairs")
@@ -109,6 +138,103 @@ func _ready() -> void:
 		print("AUTOTEST done")
 		get_tree().quit()])
 	wait = steps[0][0]
+
+
+## Kill the monsters nearest the hero so there are corpses for Liliana.
+func _kill_some(n: int) -> void:
+	var p: Player = main.player
+	var list: Array = main.monsters.filter(func(m): return not m.is_boss)
+	list.sort_custom(func(a, b): return a.wpos.distance_to(p.wpos) < b.wpos.distance_to(p.wpos))
+	for m in list.slice(0, n):
+		main.kill_monster(m)
+
+
+## Every skill of a hero with every rune, cast at the nearest monster; prints what failed.
+func _skill_test(hero: String) -> void:
+	var p: Player = main.player
+	p.set_class(hero)
+	p.level = 24
+	p.recalc()
+	for i in Skills.PASSIVE_SLOTS.size():
+		p.set_passive(i, Skills.passives_of(hero)[i * 2])
+	var ok := 0
+	var tried := 0
+	var failed: Array = []
+	for id in Skills.of_hero(hero):
+		for r in range(-1, 3):
+			var m: Monster = null
+			var bd := INF
+			for o in main.monsters:
+				var dd: float = o.wpos.distance_to(p.wpos)
+				if not o.is_boss and dd < bd:
+					bd = dd
+					m = o
+			if m == null:
+				continue
+			if bd > 1.2:
+				p.wpos = main.dungeon.spot_near(m.wpos + (p.wpos - m.wpos).normalized() * 1.0, 0.3)
+				p.sync_position()
+			p.runes[id] = r
+			p.cds.clear()
+			p.cast_t = 0.0
+			p.atk_t = 0.0
+			p.lunge = {}
+			p.body.position = Vector2.ZERO
+			p.mp = p.st.max_mp
+			p.hp = p.st.max_hp
+			p.set_slot(0, id)
+			tried += 1
+			var at: Vector2 = m.wpos
+			if Skills.SKILLS[id].kind == "corpse" or Skills.SKILLS[id].has("corpse"):
+				var c: Array = main.corpses_near(p.wpos, 999.0, 1)
+				if not c.is_empty():
+					at = c[0].wpos
+					p.wpos = main.dungeon.spot_near(at, 1.5)
+					p.sync_position()
+			if p.use_slot(0, at, null if at != m.wpos else m):
+				ok += 1
+			else:
+				failed.append("%s/%d" % [id, r])
+	print("AUTOTEST skills %s: %d of %d went off, minions %d, corpses %d%s" % [hero, ok, tried, main.minions.size(), main.corpses.size(),
+		"" if failed.is_empty() else ", failed: " + ", ".join(PackedStringArray(failed))])
+	p.bar = Skills.DEFAULT_BAR[hero].duplicate()
+	p.lunge = {}
+	p.body.position = Vector2.ZERO
+
+
+## Stand by the biggest pack and cast a few skills, for a screenshot of how they look.
+func _showcase(hero: String, ids: Array) -> void:
+	var p: Player = main.player
+	p.set_class(hero)
+	p.level = 24
+	p.recalc()
+	var best: Monster = null
+	var bn := -1
+	for m in main.monsters:
+		if m.is_boss:
+			continue
+		var n := 0
+		for o in main.monsters:
+			if o.wpos.distance_to(m.wpos) < 3.5:
+				n += 1
+		if n > bn:
+			bn = n
+			best = m
+	if best == null:
+		return
+	p.wpos = main.dungeon.spot_near(best.wpos + Vector2(2.5, 2.5), 1.0)
+	p.sync_position()
+	main.camera.position = p.position
+	main.camera.reset_smoothing()
+	for m in main.monsters:
+		if m.wpos.distance_to(best.wpos) < 4.0:
+			m.wake()
+	for id in ids:
+		p.cds.clear()
+		p.cast_t = 0.0
+		p.atk_t = 0.0
+		p.mp = p.st.max_mp
+		p.use_skill(id, best.wpos, best)
 
 
 func _npc(role: String):
@@ -218,9 +344,7 @@ func _process(dt: float) -> void:
 		if best and bd < 25.0:
 			p.command_attack(best)
 			if bd < 6.0 and main.dungeon.los(p.wpos, best.wpos):
-				p.cast_fire(best.wpos)
-			if p.level >= 3:
-				p.cast_nova()
+				p.use_slot(randi_range(1, 5), best.wpos, best)
 	wait -= dt
 	if wait <= 0.0 and step_i < steps.size():
 		steps[step_i][1].call()

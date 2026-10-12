@@ -1,6 +1,7 @@
 class_name Projectile
 extends Node2D
-## Missiles: the hero's fireball, and monster hex bolts, arrows, quills and bile.
+## Missiles: the heroes' skill shots and their minions' fire and arrows, and monster hex
+## bolts, arrows, quills and bile.
 ## They fly over low obstacles and water, and stop at walls, trees and rocks.
 
 const LOOK := {
@@ -9,6 +10,8 @@ const LOOK := {
 	"bile": {"core": Color(0.85, 1, 0.6), "mid": Color(0.35, 0.75, 0.1), "r": 8.0, "light": Color(0.5, 0.9, 0.2)},
 	"arrow": {"core": Color(0.85, 0.8, 0.7), "mid": Color(0.5, 0.4, 0.3), "r": 0.0},
 	"quill": {"core": Color(0.9, 0.85, 0.7), "mid": Color(0.45, 0.3, 0.2), "r": 0.0},
+	"spark": {"core": Color(1, 0.95, 0.75), "mid": Color(1, 0.5, 0.12), "r": 7.0, "light": Color(1.0, 0.6, 0.25)},
+	"bone": {"core": Color(0.98, 0.96, 0.88), "mid": Color(0.75, 0.72, 0.62), "r": 0.0},
 }
 
 var main
@@ -21,6 +24,11 @@ var elem := "phys"
 var dmg := [1, 2]
 var life := 1.4
 var radius := 0.25
+# hero and minion shots: what a hit does, and how the shot behaves
+var hit_cb: Callable
+var pierce := false
+var boom := 0.0
+var hit_list: Array = []
 
 
 func setup(m, src, k: String, at: Vector2, v: Vector2, damage: Array, element: String) -> void:
@@ -34,6 +42,23 @@ func setup(m, src, k: String, at: Vector2, v: Vector2, damage: Array, element: S
 	dmg = damage
 	life = 1.4 if k == "fire" else 1.6
 	radius = 0.25 if k == "fire" else 0.2
+	position = Game.iso(wpos)
+
+
+## A shot of the hero or a minion: hit(monster) applies the damage; pierce flies on through
+## foes; boom > 0 explodes on impact and hits everything within that radius.
+func setup_hero(m, k: String, at: Vector2, v: Vector2, hit: Callable, pierces := false, boom_r := 0.0, reach := 12.0) -> void:
+	main = m
+	source = null
+	from_player = true
+	kind = k
+	wpos = at
+	vel = v
+	hit_cb = hit
+	pierce = pierces
+	boom = boom_r
+	life = reach / maxf(1.0, v.length())
+	radius = 0.25
 	position = Game.iso(wpos)
 
 
@@ -63,20 +88,32 @@ func _process(dt: float) -> void:
 	if not hit:
 		wpos = next
 	if from_player:
+		var struck: Monster = null
 		if not hit:
 			for m in main.monsters:
-				if not m.dead and m.wpos.distance_to(wpos) < m.radius + radius:
-					hit = true
+				if not m.dead and not m in hit_list and m.wpos.distance_to(wpos) < m.radius + radius:
+					struck = m
 					break
-		if hit:
-			Game.play("boom")
-			main.burst(wpos, Color("ff9a3a"), 22, 3.0, 22.0, 0.5, 3.0)
-			main.burst(wpos, Color("ffe08a"), 8, 1.5, 22.0, 0.4, 2.0)
-			main.flash(wpos)
-			main.shake(5.0)
-			for m in main.monsters.duplicate():
-				if not m.dead and m.wpos.distance_to(wpos) < 1.2 + m.radius:
-					main.damage_monster(m, randi_range(dmg[0], dmg[1]), Color("ffb347"))
+		if struck and pierce:
+			hit_list.append(struck)
+			hit_cb.call(struck)
+			main.burst(wpos, LOOK[kind].mid, 5, 1.5, 22.0, 0.3, 2.0)
+		elif struck or (hit and boom > 0.0):
+			hit = true
+			if boom > 0.0:
+				Game.play("boom")
+				main.burst(wpos, LOOK[kind].mid, 22, 3.0, 22.0, 0.5, 3.0)
+				main.burst(wpos, LOOK[kind].core, 8, 1.5, 22.0, 0.4, 2.0)
+				if kind in ["fire", "spark"]:
+					main.flash(wpos)
+				main.shake(4.0)
+				main.add_ring(wpos, boom, 0.35, false, LOOK[kind].mid)
+				for m in main.monsters.duplicate():
+					if not m.dead and m.wpos.distance_to(wpos) < boom + m.radius:
+						hit_cb.call(m)
+			else:
+				hit_cb.call(struck)
+				main.burst(wpos, LOOK[kind].mid, 10, 1.5, 22.0, 0.35, 2.0)
 	else:
 		var p: Player = main.player
 		if not hit and p.wpos.distance_to(wpos) < p.radius + radius:

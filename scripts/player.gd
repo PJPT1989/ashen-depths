@@ -50,7 +50,17 @@ var target_obj = null           # an Interactable to walk to and use
 var atk_t := 0.0
 var swing := 0.0
 var cast_t := 0.0
-var nova_cd := 0.0
+# skills (see Skills): the six hotbar slots, the rune picked for each skill, passives
+var bar: Array = ["", "", "", "", "", ""]
+var runes := {}                 # skill id -> rune index, -1 or missing = no rune
+var passives: Array = []        # passive ids, up to Skills.passive_slots(level)
+var cds := {}                   # skill id -> cooldown left
+var buffs: Array = []           # {id, fx, t, len}
+var fx := {}                    # buffs and passives summed (_sum_fx)
+var attack_slot := 0            # the slot used on the clicked monster
+var lunge := {}                 # leap or charge in progress
+var combat_t := 9.0             # seconds since the hero last hit or was hit
+var cheat_cd := 0.0
 var hit_flash := 0.0
 var chill := 0.0
 var poison_t := 0.0
@@ -79,9 +89,37 @@ func _ready() -> void:
 func set_class(c: String) -> void:
 	cls = c
 	base = CLASSES[c].stats.duplicate()
+	bar = Skills.DEFAULT_BAR[c].duplicate()
+	runes = {}
+	passives = []
+	cds = {}
+	buffs = []
 	recalc()
 	hp = st.max_hp
-	mp = st.max_mp
+	mp = Skills.RESOURCE[c].get("start", st.max_mp)
+
+
+## Put skill id on hotbar slot i (it leaves any other slot it was on).
+func set_slot(i: int, id: String) -> void:
+	for k in bar.size():
+		if bar[k] == id:
+			bar[k] = ""
+	bar[i] = id
+	stats_changed.emit()
+
+
+func set_rune(id: String, r: int) -> void:
+	runes[id] = r
+	stats_changed.emit()
+
+
+func set_passive(i: int, id: String) -> void:
+	passives = passives.filter(func(p): return p != id)
+	while passives.size() <= i:
+		passives.append("")
+	passives[i] = id
+	passives = passives.filter(func(p): return p != "")
+	recalc()
 
 
 static func xp_needed(l: int) -> int:
@@ -131,6 +169,7 @@ func recalc() -> void:
 		var total := {"str": base.str + mm.str + mm.all, "dex": base.dex + mm.dex + mm.all}
 		active = worn.filter(func(it): return level >= it.req_lvl and total.str >= it.req_str and total.dex >= it.req_dex)
 	var m := _sum_mods(active)
+	fx = _sum_fx()
 	var s := {}
 	s.str = base.str + m.str + m.all
 	s.dex = base.dex + m.dex + m.all
@@ -150,22 +189,26 @@ func recalc() -> void:
 	for it in active:
 		if it.type != "charm":
 			def += it.def
-	s.def = def + s.dex / 4
+	s.def = roundi((def + s.dex / 4) * (1.0 + fx.get("def", 0.0) / 100.0))
 	var sh = equip.offhand if equip.offhand in active else null
 	s.block = 0
 	if sh != null:
 		s.block = clampi(roundi((sh.block + m.block) * (s.dex - 15) / float(level * 2)), 0, 75)
 	var c: Dictionary = CLASSES[cls]
-	s.max_hp = roundi(c.life + (level - 1) * c.life_lvl + (s.vit - c.stats.vit) * c.life_vit + m.life)
-	s.max_mp = roundi(c.mana + (level - 1) * c.mana_lvl + (s.ene - c.stats.ene) * c.mana_ene + m.mana)
+	s.max_hp = roundi((c.life + (level - 1) * c.life_lvl + (s.vit - c.stats.vit) * c.life_vit + m.life) * (1.0 + fx.get("life", 0.0) / 100.0))
+	var res: Dictionary = Skills.RESOURCE[cls]
+	var mana: float = res.max + m.mana if res.has("max") else c.mana + (level - 1) * c.mana_lvl + (s.ene - c.stats.ene) * c.mana_ene + m.mana
+	s.max_mp = roundi(mana * (1.0 + fx.get("rmax", 0.0) / 100.0))
+	s.leech += fx.get("leech", 0.0)
 	for e in ["fire", "cold", "lit", "pois"]:
 		s["res_" + e] = mini(75, m["res_" + e] + m.res_all)
 	var wspd: float = w.spd if w != null else 1.0
-	s.atk_time = 0.6 * wspd / (1.0 + s.ias / 120.0)
-	s.speed = SPEED * (1.0 + s.frw * 1.5 / (s.frw + 150.0))
+	s.atk_time = 0.6 * wspd / (1.0 + s.ias / 120.0) / (1.0 + fx.get("aspd", 0.0) / 100.0)
+	s.speed = SPEED * (1.0 + s.frw * 1.5 / (s.frw + 150.0)) * (1.0 + fx.get("speed", 0.0) / 100.0)
+	s.thorns += roundi((s.dmg_min + s.dmg_max) * 0.5 * fx.get("thorns", 0.0) / 100.0)
+	# spell damage: grows with level and the +% spell damage on items
 	var sp: float = 1.0 + s.spell / 100.0
-	s.fire = [roundi((5 + level * 2) * sp), roundi((9 + level * 3) * sp)]
-	s.nova = [roundi((4 + level * 1.5) * sp), roundi((8 + level * 2) * sp)]
+	s.spell_dmg = [roundi((5 + level * 2) * sp), roundi((9 + level * 3) * sp)]
 	s.belt_cap = equip.belt.potions if equip.belt != null else 3
 	st = s
 	belt.hp = mini(belt.hp, s.belt_cap)
@@ -208,6 +251,10 @@ func gain_xp(amount: int) -> void:
 		xp -= xp_needed(level)
 		level += 1
 		stat_points += STAT_POINTS_PER_LEVEL
+		# a newly learned skill goes onto the first empty hotbar slot
+		for id in Skills.of_hero(cls):
+			if Skills.SKILLS[id].lvl == level and not id in bar and bar.has(""):
+				bar[bar.find("")] = id
 		recalc()
 		hp = st.max_hp
 		mp = st.max_mp
@@ -352,6 +399,7 @@ func quick_unequip(slot: String) -> void:
 
 func command_attack(m: Monster) -> void:
 	target_monster = m
+	attack_slot = 0
 	target_drop = null
 	target_obj = null
 	path.clear()
@@ -384,51 +432,545 @@ func command_move(to: Vector2) -> void:
 	stuck = 0.0
 
 
-func cast_fire(at: Vector2) -> void:
-	if dead or cast_t > 0.0:
-		return
-	if main.in_town():
-		return
-	if mp < 5:
+# ---------- skills ----------
+
+## Use the skill on hotbar slot i (0 = left click ... 5 = key 4) toward world point `at`;
+## target is the monster under the cursor, if any. Returns true if the skill went off.
+func use_slot(i: int, at: Vector2, target: Monster = null) -> bool:
+	if i < 0 or i >= bar.size() or bar[i] == "":
+		return false
+	return use_skill(bar[i], at, target, i)
+
+
+func use_skill(id: String, at: Vector2, target: Monster = null, slot := -1) -> bool:
+	if dead or main.state != "play" or main.in_town():
+		return false
+	var s := Skills.resolve(id, runes.get(id, -1))
+	if level < s.lvl or cds.get(id, 0.0) > 0.0 or cast_t > 0.0 or not lunge.is_empty():
+		return false
+	var cost := skill_cost(s)
+	if mp < cost:
 		main.no_mana()
-		return
-	var d := at - wpos
-	if d.length() < 0.01:
-		d = Vector2(fdir, -fdir)
-	d = d.normalized()
-	mp -= 5
-	cast_t = 0.35
-	play_action("cast", 0.4)
+		return false
+	if s.has("life_cost") and hp <= st.max_hp * s.life_cost / 100.0 + 1.0:
+		main.floater(wpos, "Not enough life", Color("ff7b7b"))
+		return false
+	var dir := at - wpos
+	dir = dir.normalized() if dir.length() > 0.05 else face_vec.normalized()
+	if s.kind == "melee":
+		if target == null or target.dead:
+			target = _melee_target(dir)
+		if target == null:
+			return false
+		if target.wpos.distance_to(wpos) > 1.0 + target.radius:
+			# walk up to it first; _process uses the skill when in reach
+			command_attack(target)
+			attack_slot = maxi(slot, 0)
+			return false
+		if atk_t > 0.0:
+			return false
+	if not _run_skill(s, at, dir, target):
+		return false
+	mp -= cost
+	cds[id] = s.get("cd", 0.0) * fx.get("cdr", 1.0)
+	return true
+
+
+func skill_cost(s: Dictionary) -> float:
+	return s.get("cost", 0) * fx.get("cost", 1.0)
+
+
+## How close the hero must be to a target before an attacking skill is used on it.
+func skill_reach(s: Dictionary) -> float:
+	match s.kind:
+		"melee": return 1.0
+		"cone": return s.range * 0.85
+		"beam": return s.length * 0.9
+		"nova": return s.radius * 0.8
+		"missile", "chain": return 8.0
+		"blast", "cloud", "curse", "corpse": return 10.0
+	return 99.0
+
+
+## Skills that keep firing at a clicked monster, rather than going off once.
+func skill_repeats(s: Dictionary) -> bool:
+	return s.kind in ["melee", "cone", "beam", "missile", "chain", "nova"]
+
+
+func _melee_target(dir: Vector2) -> Monster:
+	var best: Monster = null
+	var bd := INF
+	for m in main.monsters:
+		var v: Vector2 = m.wpos - wpos
+		var dd := v.length()
+		if dd <= 1.0 + m.radius and dd < bd and (dd < 0.5 or v.normalized().dot(dir) > 0.2):
+			bd = dd
+			best = m
+	return best
+
+
+func _run_skill(s: Dictionary, at: Vector2, dir: Vector2, target: Monster) -> bool:
+	var col := elem_color(s.get("elem", "phys"))
+	var spell_lock: float = 0.32 / (1.0 + fx.get("aspd", 0.0) / 100.0)
 	path.clear()
-	target_monster = null
-	face(d)
-	main.spawn_shot(null, "fire", wpos + d * 0.4, d * 9.0, st.fire, "fire")
-	Game.play("fire")
+	match s.kind:
+		"melee":
+			face(target.wpos - wpos)
+			atk_t = st.atk_time * s.get("aspd", 1.0)
+			swing = 0.25
+			play_action("attack", maxf(0.3, atk_t * 0.85))
+			Game.play("swing")
+			var list: Array = [target]
+			if s.get("arc", 0.0) > 0.0:
+				main.add_ring(target.wpos, s.arc, 0.3, false, col)
+				for m in main.monsters:
+					if m != target and m.wpos.distance_to(target.wpos) <= s.arc + m.radius:
+						list.append(m)
+			_hit_list(list, s)
+		"cone":
+			face(dir)
+			cast_t = spell_lock
+			atk_t = spell_lock + 0.05
+			play_action("cast", 0.35)
+			Game.play("fire" if s.elem == "fire" else "swing")
+			var half: float = s.angle * 0.5
+			for k in 9:
+				var a: float = -half + s.angle * k / 8.0
+				main.burst(wpos + dir.rotated(a) * s.range * 0.75, col, 4, 1.6, 20.0, 0.35, 3.0)
+			var list: Array = []
+			for m in main.monsters:
+				var v: Vector2 = m.wpos - wpos
+				if v.length() <= s.range + m.radius and absf(dir.angle_to(v)) <= half + 0.15 and main.dungeon.los(wpos, m.wpos):
+					list.append(m)
+			_hit_list(list, s)
+		"missile":
+			face(dir)
+			cast_t = spell_lock
+			atk_t = spell_lock + 0.05
+			play_action("cast", 0.35)
+			Game.play("fire" if s.look in ["fire", "spark"] else "bolt")
+			var n: int = s.get("count", 1)
+			var gained := {"done": false}
+			for k in n:
+				var dk := dir if n == 1 else dir.rotated(s.spread * (float(k) / (n - 1) - 0.5))
+				var on_hit := func(m: Monster):
+					if _hit(m, s) and s.has("gen") and not gained.done:
+						gained.done = true
+						_gain(s.gen)
+				var p: Projectile = preload("res://scenes/projectile.tscn").instantiate()
+				p.setup_hero(main, s.look, wpos + dk * 0.4, dk * s.speed, on_hit, s.get("pierce", false), s.get("boom", 0.0))
+				main.world.add_child(p)
+		"chain":
+			var first := target if target != null and target.wpos.distance_to(wpos) <= s.range else _nearest_to(at, 3.0, s.range)
+			if first == null:
+				first = _nearest_to(wpos + dir * 4.0, 4.5, s.range)
+			if first == null:
+				return false
+			face(first.wpos - wpos)
+			cast_t = spell_lock
+			atk_t = spell_lock + 0.05
+			play_action("cast", 0.35)
+			Game.play("bolt")
+			var pts: Array = [wpos]
+			var hit_set: Array = []
+			var cur: Monster = first
+			for j in s.jumps + 1:
+				hit_set.append(cur)
+				pts.append(cur.wpos)
+				var next: Monster = null
+				var nd := 4.5
+				for m in main.monsters:
+					if not m in hit_set and m.wpos.distance_to(cur.wpos) < nd and main.dungeon.los(cur.wpos, m.wpos):
+						nd = m.wpos.distance_to(cur.wpos)
+						next = m
+				if next == null:
+					break
+				cur = next
+			SkillFx.make(main, "chain", pts, col, 0.3)
+			_hit_list(hit_set, s)
+		"beam":
+			face(dir)
+			cast_t = spell_lock + 0.1
+			atk_t = cast_t + 0.05
+			play_action("cast", 0.4)
+			Game.play("fire")
+			var end := wpos
+			var step := 0.0
+			while step < s.length:
+				var nxt: Vector2 = wpos + dir * (step + 0.25)
+				if not main.dungeon.open_air(nxt):
+					break
+				step += 0.25
+				end = nxt
+			SkillFx.make(main, "beam", [wpos + dir * 0.4, end], col, 0.3)
+			var list: Array = []
+			for m in main.monsters:
+				if Geometry2D.get_closest_point_to_segment(m.wpos, wpos, end).distance_to(m.wpos) <= 0.55 + m.radius:
+					list.append(m)
+			_hit_list(list, s)
+		"nova":
+			cast_t = spell_lock
+			atk_t = spell_lock + 0.05
+			play_action("attack" if s.src == "weapon" else "cast", 0.4)
+			_nova(s, wpos)
+			if s.has("again"):
+				get_tree().create_timer(s.again).timeout.connect(func():
+					if not dead and main.state == "play":
+						_nova(s, wpos))
+			if s.has("self_heal"):
+				_heal(s.self_heal)
+		"blast":
+			var p := _clamp_reach(at, 14.0)
+			face(p - wpos)
+			cast_t = spell_lock
+			play_action("cast", 0.4)
+			Game.play("fire")
+			var n: int = s.get("count", 1)
+			for k in n:
+				var q := p if k == 0 else p + Vector2(randf_range(-1.8, 1.8), randf_range(-1.8, 1.8))
+				var f := SkillFx.make(main, "blast", [q], col, s.delay + k * 0.22, s.radius)
+				f.done = func():
+					Game.play("boom")
+					main.flash(q)
+					main.shake(6.0)
+					main.burst(q, col, 24, 3.2, 20.0, 0.6, 3.5)
+					main.add_ring(q, s.radius, 0.4, false, col)
+					var list: Array = []
+					for m in main.monsters:
+						if m.wpos.distance_to(q) <= s.radius + m.radius:
+							list.append(m)
+					_hit_list(list, s)
+		"cloud":
+			var p := _clamp_reach(at, 14.0)
+			face(p - wpos)
+			cast_t = spell_lock
+			play_action("cast", 0.4)
+			Game.play("nova")
+			var per := maxi(1, roundi(_dmg(s) / (s.dur * 2.0)))
+			var f := SkillFx.make(main, "cloud", [p], col, s.dur, s.radius)
+			f.tick = func():
+				for m in main.monsters.duplicate():
+					if m.wpos.distance_to(p) <= s.radius + m.radius:
+						_hit(m, s, per)
+		"leap", "charge":
+			var to := wpos
+			if s.kind == "leap":
+				to = main.dungeon.nearest_floor(wpos + dir * minf(s.dist, maxf(1.0, (at - wpos).length())))
+				if to == Vector2.INF:
+					return false
+			else:
+				var step := 0.0
+				while step < s.dist and main.dungeon.is_free(wpos + dir * (step + 0.25), radius):
+					step += 0.25
+				if step < 0.75:
+					return false
+				to = wpos + dir * step
+			face(to - wpos)
+			target_monster = null
+			lunge = {"s": s, "from": wpos, "to": to, "t": 0.0, "len": 0.42 if s.kind == "leap" else maxf(0.12, wpos.distance_to(to) / 20.0), "hit": []}
+			cast_t = lunge.len + 0.05
+			play_action("attack" if s.kind == "charge" else "cast", lunge.len + 0.1)
+			Game.play("swing")
+		"teleport":
+			var to: Vector2 = main.dungeon.nearest_floor(wpos + dir * minf(s.dist, maxf(1.0, (at - wpos).length())))
+			if to == Vector2.INF or not main.dungeon.is_free(to, radius):
+				return false
+			Game.play("nova")
+			main.burst(wpos, col, 20, 2.5, 20.0, 0.5, 3.0)
+			if s.get("pct", 0) > 0:
+				main.flash(wpos)
+				main.add_ring(wpos, s.boom, 0.35, false, col)
+				var list: Array = []
+				for m in main.monsters:
+					if m.wpos.distance_to(wpos) <= s.boom + m.radius:
+						list.append(m)
+				_hit_list(list, s)
+			wpos = to
+			target_monster = null
+			sync_position()
+			main.burst(wpos, col, 20, 2.5, 20.0, 0.5, 3.0)
+			_self_buff(s)
+		"buff":
+			if s.has("life_cost"):
+				hp -= st.max_hp * s.life_cost / 100.0
+				main.burst(wpos, Color("8a0b0b"), 16, 2.0, 20.0, 0.6, 3.0)
+			add_buff(s.id, s.fx, s.dur)
+			if s.get("fill", false):
+				mp = st.max_mp
+			cast_t = spell_lock
+			play_action("cast", 0.4)
+			Game.play("level")
+			main.burst(wpos, Skills.RESOURCE[cls].color, 24, 2.0, 30.0, 0.8, 3.0)
+		"shout":
+			add_buff(s.id, s.fx, s.dur)
+			cast_t = spell_lock
+			play_action("cast", 0.4)
+			Game.play("nova")
+			main.add_ring(wpos, s.radius, 0.5, false, Color(1.0, 0.8, 0.4))
+			main.shake(4.0)
+			for m in main.monsters:
+				if m.wpos.distance_to(wpos) <= s.radius and main.dungeon.los(wpos, m.wpos):
+					m.afflict(s.debuff, s.dur)
+					m.wake()
+		"curse":
+			var p := _clamp_reach(at, 14.0)
+			face(p - wpos)
+			cast_t = spell_lock
+			play_action("cast", 0.4)
+			Game.play("nova")
+			main.add_ring(p, s.radius, 0.6, false, Color(0.7, 0.35, 1.0))
+			main.burst(p, Color(0.55, 0.25, 0.8), 18, 2.0, 10.0, 0.8, 3.0)
+			var rot := 0.0
+			if s.debuff.has("dot"):
+				var ds := s.duplicate()
+				ds.pct = s.debuff.dot
+				ds.src = "spell"
+				rot = _dmg(ds)
+			for m in main.monsters:
+				if m.wpos.distance_to(p) <= s.radius + m.radius:
+					m.afflict(s.debuff, s.dur)
+					m.wake()
+					if rot > 0.0:
+						m.add_dot(rot, s.dur, elem_color("pois"))
+		"summon":
+			if not _summon(s, at):
+				return false
+			cast_t = spell_lock
+			play_action("cast", 0.4)
+			Game.play("nova")
+		"corpse":
+			var bodies: Array = main.corpses_near(_clamp_reach(at, 14.0), s.radius, s.corpses)
+			if bodies.is_empty():
+				main.floater(wpos, "No corpses there", Color("bbbbbb"))
+				return false
+			face(at - wpos)
+			cast_t = spell_lock
+			play_action("cast", 0.4)
+			Game.play("boom")
+			main.shake(5.0)
+			for c in bodies:
+				var q: Vector2 = c.wpos
+				var dmg := _dmg(s) + roundi(c.max_hp / 10.0)
+				main.burst(q, Color(c.d.blood).lightened(0.1), 26, 3.4, 12.0, 0.7, 3.5)
+				main.add_ring(q, s.boom, 0.35, false, col)
+				for m in main.monsters.duplicate():
+					if m.wpos.distance_to(q) <= s.boom + m.radius:
+						_hit(m, s, dmg)
+				main.remove_corpse(c)
+				if s.has("self_heal_per"):
+					_heal(s.self_heal_per)
+	return true
 
 
-func cast_nova() -> void:
-	if dead or main.in_town():
-		return
-	if level < 3:
-		main.floater(wpos, "Frost Nova unlocks at level 3", Color("8ea4ff"))
-		return
-	if nova_cd > 0.0 or cast_t > 0.0:
-		return
-	if mp < 12:
-		main.no_mana()
-		return
-	mp -= 12
-	nova_cd = 0.8
-	cast_t = 0.3
-	play_action("cast", 0.35)
-	Game.play("nova")
-	main.add_ring(wpos, 4.2, 0.45, false)
-	for m in main.monsters.duplicate():
-		if m.dead:
-			continue
-		if m.wpos.distance_to(wpos) < 4.2 and dungeon.los(wpos, m.wpos):
-			m.slow = 3.0
-			main.damage_monster(m, randi_range(st.nova[0], st.nova[1]), Color("a8c8ff"))
+func _nova(s: Dictionary, at: Vector2) -> void:
+	var col := elem_color(s.get("elem", "phys"))
+	Game.play("boom" if s.get("elem", "phys") == "fire" else "nova")
+	main.add_ring(at, s.radius, 0.45, false, col)
+	for k in 16:
+		var a := TAU * k / 16.0
+		main.burst(at + Vector2(cos(a), sin(a)) * s.radius * 0.7, col, 3, 1.8, 16.0, 0.4, 3.0)
+	if s.get("elem", "phys") == "fire":
+		main.flash(at)
+	main.shake(3.0 + s.radius)
+	var list: Array = []
+	for m in main.monsters:
+		if m.wpos.distance_to(at) <= s.radius + m.radius and main.dungeon.los(at, m.wpos):
+			list.append(m)
+	_hit_list(list, s)
+
+
+func _summon(s: Dictionary, at: Vector2) -> bool:
+	var mine: Array = main.minions.filter(func(m): return m.skill_id == s.id)
+	var spots: Array = []
+	if s.has("corpse"):
+		var bodies: Array = main.corpses_near(_clamp_reach(at, 14.0), 4.0, s.corpse)
+		if bodies.is_empty():
+			bodies = main.corpses_near(wpos, 6.0, s.corpse)
+		if bodies.is_empty():
+			main.floater(wpos, "No corpses nearby", Color("bbbbbb"))
+			return false
+		for c in bodies:
+			spots.append(c.wpos)
+			main.remove_corpse(c)
+	else:
+		var n: int = s.count
+		if s.dur == 0:
+			n = mini(n, s.max - mine.size())
+			if n <= 0:
+				for m in mine:
+					m.hp = m.max_hp
+				main.floater(wpos, "Already at full strength", Color("bbbbbb"))
+				return false
+		for k in n:
+			spots.append(main.dungeon.spot_near(wpos + Vector2(randf_range(-1.5, 1.5), randf_range(-1.5, 1.5)), 0.4))
+	for q in spots:
+		var m := Minion.new()
+		m.main = main
+		m.dungeon = main.dungeon
+		m.setup(s, q, level, fx.get("minion", 0.0))
+		main.world.add_child(m)
+		main.minions.append(m)
+		mine.append(m)
+		main.burst(q, Color(0.45, 0.95, 0.6), 14, 1.6, 8.0, 0.6, 3.0)
+	while mine.size() > s.max:
+		mine.pop_front().die()
+	return true
+
+
+func _self_buff(s: Dictionary) -> void:
+	if s.has("self"):
+		add_buff(s.id + "_after", s.self.fx, s.self.dur)
+
+
+## A buff on the hero (fx as in Skills); a newer one with the same id replaces the old.
+func add_buff(id: String, effects: Dictionary, dur: float) -> void:
+	buffs = buffs.filter(func(b): return b.id != id)
+	buffs.append({"id": id, "fx": effects, "t": dur, "len": dur})
+	recalc()
+
+
+## Sum of the hero's buffs and passives. Multipliers (taken, gen, cost, cdr, decay, low_life)
+## multiply; everything else adds.
+func _sum_fx() -> Dictionary:
+	var out := {}
+	var parts: Array = []
+	for b in buffs:
+		parts.append(b.fx)
+	for id in passives:
+		parts.append(Skills.PASSIVES[id])
+	for p in parts:
+		for k in p:
+			if k in ["name", "lvl", "desc", "hero"]:
+				continue
+			if k in ["taken", "gen", "cost", "cdr", "decay", "low_life"]:
+				out[k] = out.get(k, 1.0) * p[k]
+			else:
+				out[k] = out.get(k, 0.0) + p[k]
+	return out
+
+
+func _dmg(s: Dictionary) -> int:
+	var base: Array = [st.dmg_min, st.dmg_max] if s.get("src", "spell") == "weapon" else st.spell_dmg
+	var v: float = randi_range(base[0], base[1]) * s.get("pct", 100) / 100.0 * (1.0 + fx.get("dmg", 0.0) / 100.0)
+	return maxi(1, roundi(v))
+
+
+## One hit of skill s on monster m; dmg < 0 rolls the skill's damage. Weapon skills can miss
+## (Diablo II to-hit) and crit. Returns true if it hit.
+func _hit(m: Monster, s: Dictionary, dmg := -1) -> bool:
+	if m == null or m.dead:
+		return false
+	var weapon: bool = s.get("src", "spell") == "weapon"
+	if weapon and randf() > Game.hit_chance(st.ar, m.def, level, m.mlvl):
+		main.floater(m.wpos, "miss", Color("9a9080"))
+		m.wake()
+		return false
+	if dmg < 0:
+		dmg = _dmg(s)
+	var elem: String = s.get("elem", "phys")
+	var col := elem_color(elem)
+	if weapon and randf() < 0.08:
+		dmg *= 2
+		col = Color("ffd34a")
+		main.shake(3.0)
+	if weapon:
+		Game.play("hit")
+		main.burst(m.wpos, Color(m.d.blood).lightened(0.15), 6, 1.8, 18.0 * m.size, 0.5, 2.5)
+	var dealt: int = main.damage_monster(m, dmg, col)
+	combat_t = 0.0
+	if not m.dead:
+		var deb := {}
+		for k in ["slow", "stun", "fear"]:
+			if s.has(k):
+				deb[k] = s[k]
+		if s.has("vuln"):
+			deb.vuln = s.vuln
+		if not deb.is_empty():
+			m.afflict(deb, 4.0 if s.has("vuln") else s.get("slow", 0.0))
+		if s.has("knock") and not m.is_boss:
+			var away: Vector2 = (m.wpos - wpos).normalized()
+			for k in 4:
+				m.move_by(away * s.knock / 4.0)
+		var burn: float = s.get("burn", 0.0) + (fx.get("burn", 0.0) if elem == "fire" else 0.0)
+		if burn > 0.0 and dealt * burn / 100.0 >= 1.0:
+			m.add_dot(dealt * burn / 100.0, 3.0, col)
+	if s.has("heal"):
+		_heal(s.heal)
+	var leech: float = s.get("leech", 0.0) + (st.leech if weapon else fx.get("leech", 0.0))
+	if leech > 0.0:
+		hp = minf(st.max_hp, hp + dealt * leech / 100.0)
+	if weapon and st.mleech > 0:
+		mp = minf(st.max_mp, mp + dealt * st.mleech / 100.0)
+	return true
+
+
+## Hit every monster in the list; gives the skill's resource once if anything was hit
+## (Overrun's Rallying rune gives it per foe).
+func _hit_list(list: Array, s: Dictionary) -> int:
+	var n := 0
+	for m in list:
+		if _hit(m, s):
+			n += 1
+	if n > 0 and s.has("gen"):
+		_gain(s.gen * (n if s.kind == "charge" else 1))
+	return n
+
+
+func _gain(n: float) -> void:
+	mp = minf(st.max_mp, mp + n * fx.get("gen", 1.0))
+
+
+func _heal(pct: float) -> void:
+	hp = minf(st.max_hp, hp + st.max_hp * pct / 100.0)
+
+
+func _clamp_reach(at: Vector2, r: float) -> Vector2:
+	return wpos + (at - wpos).limit_length(r)
+
+
+func _nearest_to(at: Vector2, within: float, reach: float) -> Monster:
+	var best: Monster = null
+	var bd := within
+	for m in main.monsters:
+		var dd: float = m.wpos.distance_to(at)
+		if dd < bd and m.wpos.distance_to(wpos) <= reach and main.dungeon.los(wpos, m.wpos):
+			bd = dd
+			best = m
+	return best
+
+
+static func elem_color(elem: String) -> Color:
+	return {"fire": Color("ff9a3a"), "cold": Color("8ec8ff"), "lit": Color("fff07a"), "pois": Color("7adf5a")}.get(elem, Color("e8e0d0"))
+
+
+## Leap and charge: move along the jump, hitting what is in the way (charge) or where it lands.
+func _update_lunge(dt: float) -> void:
+	var s: Dictionary = lunge.s
+	lunge.t += dt
+	var p := minf(1.0, lunge.t / lunge.len)
+	wpos = lunge.from.lerp(lunge.to, p)
+	if s.kind == "leap":
+		body.position.y = -sin(p * PI) * 46.0
+	else:
+		main.burst(wpos, Color(0.6, 0.55, 0.45), 2, 1.0, 4.0, 0.4, 2.5)
+		for m in main.monsters.duplicate():
+			if not m in lunge.hit and m.wpos.distance_to(wpos) <= 0.8 + m.radius:
+				lunge.hit.append(m)
+				_hit_list([m], s)
+	sync_position()
+	if p >= 1.0:
+		body.position.y = 0.0
+		if s.kind == "leap":
+			_nova(s, wpos)
+			main.burst(wpos, Color(0.55, 0.5, 0.4), 20, 3.0, 4.0, 0.6, 3.0)
+		_self_buff(s)
+		lunge = {}
+
+
+## A monster died: Soul Harvest feeds on deaths nearby.
+func on_kill(m: Monster) -> void:
+	if fx.get("soul_kill", 0.0) > 0.0 and m.wpos.distance_to(wpos) < 10.0:
+		_gain(fx.soul_kill)
 
 
 func drink(kind: String) -> void:
@@ -477,6 +1019,8 @@ func take_hit(amount: int, elem := "phys", attacker = null) -> void:
 		return
 	if elem == "cold":
 		chill = 2.5
+	amount = roundi(amount * fx.get("taken", 1.0) * (fx.get("low_life", 1.0) if hp < st.max_hp * 0.3 else 1.0))
+	combat_t = 0.0
 	hp -= amount
 	hit_flash = 0.15
 	main.hurt_flash = minf(1.0, main.hurt_flash + 0.25 + amount / float(st.max_hp) * 2.0)
@@ -486,6 +1030,12 @@ func take_hit(amount: int, elem := "phys", attacker = null) -> void:
 	main.burst(wpos, Color("6a0b0b"), 5, 1.5, 20.0, 0.4, 2.0)
 	if attacker != null and st.thorns > 0 and is_instance_valid(attacker) and not attacker.dead:
 		main.damage_monster(attacker, st.thorns, Color("c9b99a"))
+	if hp <= 0 and fx.get("cheat_death", 0.0) > 0.0 and cheat_cd <= 0.0:
+		hp = st.max_hp * 0.5
+		cheat_cd = fx.cheat_death
+		main.floater(wpos, "Phoenix Heart", Color("ffb347"))
+		main.flash(wpos)
+		main.burst(wpos, Color("ff9a3a"), 30, 3.0, 30.0, 0.8, 3.0)
 	if hp <= 0:
 		hp = 0
 		main.player_died()
@@ -517,7 +1067,22 @@ func _process(dt: float) -> void:
 	atk_t -= dt
 	swing = maxf(0.0, swing - dt)
 	cast_t = maxf(0.0, cast_t - dt)
-	nova_cd -= dt
+	combat_t += dt
+	cheat_cd -= dt
+	for k in cds:
+		cds[k] = maxf(0.0, cds[k] - dt)
+	if not buffs.is_empty():
+		var had := buffs.size()
+		for b in buffs:
+			b.t -= dt
+		buffs = buffs.filter(func(b): return b.t > 0.0)
+		if buffs.size() != had:
+			recalc()
+	if not lunge.is_empty():
+		_update_lunge(dt)
+		dungeon.mark_seen(wpos)
+		queue_redraw()
+		return
 	if poison_t > 0.0:
 		poison_t -= dt
 		hp -= poison_dps * dt
@@ -525,8 +1090,14 @@ func _process(dt: float) -> void:
 			hp = 0
 			main.player_died()
 			return
-	hp = minf(st.max_hp, hp + (0.4 + st.regen * 0.5) * dt)
-	mp = minf(st.max_mp, mp + (0.4 + st.max_mp / 40.0) * dt)
+	hp = minf(st.max_hp, hp + (0.4 + st.regen * 0.5 + st.max_hp * fx.get("regen", 0.0) / 100.0) * dt)
+	var res: Dictionary = Skills.RESOURCE[cls]
+	if res.has("regen"):
+		if combat_t > 3.0:
+			mp += res.regen * fx.get("decay", 1.0) * dt     # Ferocity fades out of combat
+	else:
+		mp += st.max_mp * res.regen_frac * (1.0 + fx.get("rfast", 0.0) / 100.0) * dt
+	mp = clampf(mp + fx.get("rregen", 0.0) * dt, 0.0, st.max_mp)
 
 	if target_monster != null:
 		var m := target_monster
@@ -534,11 +1105,23 @@ func _process(dt: float) -> void:
 			target_monster = null
 		else:
 			var d := m.wpos.distance_to(wpos)
-			if d <= 1.0 + m.radius:
+			var sk := Skills.resolve(bar[attack_slot], runes.get(bar[attack_slot], -1)) if bar[attack_slot] != "" else {}
+			var reach: float = 1.0 + m.radius if sk.is_empty() or sk.kind == "melee" else skill_reach(sk)
+			if d <= reach and (sk.is_empty() or sk.kind == "melee" or dungeon.los(wpos, m.wpos)):
 				path.clear()
 				face(m.wpos - wpos)
 				if atk_t <= 0.0 and cast_t <= 0.0:
-					_attack(m)
+					if sk.is_empty():
+						_attack(m)
+					elif not use_slot(attack_slot, m.wpos, m):
+						if attack_slot != 0:
+							attack_slot = 0      # out of resource or cooling down: back to the left-click skill
+						elif sk.kind == "melee" and mp < skill_cost(sk):
+							_attack(m)
+						elif not skill_repeats(sk):
+							target_monster = null
+					elif not skill_repeats(sk):
+						target_monster = null
 			else:
 				repath -= dt
 				if repath <= 0.0 or path.is_empty():

@@ -4,7 +4,7 @@ extends Node2D
 
 var main
 var decals: Array = []   # [wpos, color, radius]
-var rings: Array = []    # [wpos, max_radius, life, total, is_click_mark]
+var rings: Array = []    # [wpos, max_radius, life, total, is_click_mark, color]
 
 
 func add_decal(at: Vector2, color: Color, r: float) -> void:
@@ -43,7 +43,7 @@ func _draw() -> void:
 	for r in rings:
 		var p: float = 1.0 - r[2] / r[3]
 		var rad: float = r[1] * p * 1.41
-		var col := Color(0.9, 0.78, 0.55, r[2] * 2.0) if r[4] else Color(0.63, 0.82, 1.0, minf(1.0, r[2] * 3.0))
+		var col := Color(0.9, 0.78, 0.55, r[2] * 2.0) if r[4] else Color(r[5], minf(1.0, r[2] * 3.0))
 		_ellipse(Game.iso(r[0]), rad * Game.HW, rad * Game.HH, col, false, 1.5 if r[4] else 4.0)
 	var now := Time.get_ticks_msec() / 400.0
 	for d in main.drops:

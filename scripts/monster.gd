@@ -59,6 +59,18 @@ var dying := 0.0
 var death_frame := 0
 var leader: Monster = null
 var draw_scale := 1.0
+# what the heroes' skills do to it
+var stun := 0.0
+var fear := 0.0
+var weak := 0.0             # % less damage dealt, while weak_t lasts
+var weak_t := 0.0
+var vuln := 0.0             # % more damage taken, while vuln_t lasts
+var vuln_t := 0.0
+var dot_dps := 0.0          # burning or rotting, while dot_t lasts
+var dot_t := 0.0
+var dot_acc := 0.0
+var dot_color := Color.WHITE
+var corpse_t := 0.0         # after death: how long the body lies (Liliana raises and bursts them)
 
 
 func setup(t: String, at: Vector2, r: int, as_role := "normal") -> void:
@@ -113,6 +125,38 @@ static func type_name(t: String, r: int) -> String:
 	return TYPES[t].names[clampi((r - 1) / 3, 0, 3)]
 
 
+## Damage multiplier from curses and shouts that weaken it.
+func dmg_mult() -> float:
+	return 1.0 - weak / 100.0 if weak_t > 0.0 else 1.0
+
+
+## A skill's lingering effects: debuff keys weak, slow, vuln, fear (see Skills).
+func afflict(debuff: Dictionary, dur: float) -> void:
+	if debuff.has("weak"):
+		weak = maxf(weak if weak_t > 0.0 else 0.0, debuff.weak)
+		weak_t = maxf(weak_t, dur)
+	if debuff.has("vuln"):
+		vuln = maxf(vuln if vuln_t > 0.0 else 0.0, debuff.vuln)
+		vuln_t = maxf(vuln_t, dur)
+	if debuff.has("slow"):
+		slow = maxf(slow, dur * debuff.slow if debuff.slow <= 1 else debuff.slow)
+	if debuff.has("fear") and not is_boss:
+		fear = maxf(fear, debuff.fear)
+	if debuff.has("stun") and not is_boss:
+		stun = maxf(stun, debuff.stun)
+	elif debuff.has("stun"):
+		stun = maxf(stun, debuff.stun * 0.3)   # bosses shrug most of it off
+
+
+## Burn or rot: total damage spread over dur seconds; a stronger one replaces a weaker.
+func add_dot(total: float, dur: float, col: Color) -> void:
+	var dps := total / dur
+	if dot_t <= 0.0 or dps * dur >= dot_dps * dot_t:
+		dot_dps = dps
+		dot_t = dur
+		dot_color = col
+
+
 func elem() -> String:
 	if "fire" in mods:
 		return "fire"
@@ -143,6 +187,12 @@ func _process(dt: float) -> void:
 	if dying > 0.0:
 		_animate_death(dt)
 		return
+	if dead:
+		corpse_t -= dt
+		if corpse_t <= 0.0:
+			main.corpses.erase(self)
+			queue_free()
+		return
 	var player: Player = main.player
 	var near := wpos.distance_to(player.wpos)
 	# only show what the hero has seen (indoors) or what is near enough to make out
@@ -156,14 +206,41 @@ func _process(dt: float) -> void:
 	tick_action(dt)
 	hit = maxf(0.0, hit - dt)
 	slow = maxf(0.0, slow - dt)
+	stun = maxf(0.0, stun - dt)
+	fear = maxf(0.0, fear - dt)
+	weak_t = maxf(0.0, weak_t - dt)
+	vuln_t = maxf(0.0, vuln_t - dt)
 	cd -= dt * (0.6 if slow > 0.0 else 1.0)
 	moving = false
 	if hit > 0.0:
 		modulate = Color(2.6, 2.6, 2.6)
+	elif stun > 0.0:
+		modulate = Color(1.5, 1.4, 0.8)
 	elif slow > 0.0:
 		modulate = Color(0.6, 0.85, 1.5)
+	elif vuln_t > 0.0 or weak_t > 0.0:
+		modulate = Color(1.15, 0.7, 1.35)
 	else:
 		modulate = Color.WHITE
+	if dot_t > 0.0:
+		dot_t -= dt
+		dot_acc += dot_dps * dt
+		if dot_acc >= maxf(1.0, dot_dps * 0.5):
+			var n := floori(dot_acc)
+			dot_acc -= n
+			main.damage_monster(self, n, dot_color)
+			if dead:
+				return
+	if stun > 0.0:
+		sync_position()
+		queue_redraw()
+		return
+	if fear > 0.0:
+		moving = move_by((wpos - player.wpos).normalized() * speed * 0.8 * dt) > 0.0
+		face(wpos - player.wpos)
+		sync_position()
+		queue_redraw()
+		return
 	_think(dt, player)
 	sync_position()
 	queue_redraw()
@@ -198,7 +275,8 @@ func _think(dt: float, player: Player) -> void:
 			var dir := (player.wpos - wpos).normalized()
 			var shot: String = d.shot
 			var v := 9.0 if shot == "arrow" else (7.0 if shot == "quill" else 5.5)
-			main.spawn_shot(self, shot, wpos + dir * 0.4, dir * v, dmg, elem())
+			var m := dmg_mult()
+			main.spawn_shot(self, shot, wpos + dir * 0.4, dir * v, [roundi(dmg[0] * m), roundi(dmg[1] * m)], elem())
 			Game.play("bolt")
 		if dist < 2.5:
 			moving = move_by((wpos - player.wpos).normalized() * spd * 0.7 * dt) > 0.0
@@ -210,6 +288,17 @@ func _think(dt: float, player: Player) -> void:
 			play_action("attack", 0.5)
 			_melee(player)
 		return
+	# a minion in the way gets attacked instead
+	if not ranged:
+		for mi in main.minions:
+			if not mi.dead and mi.wpos.distance_to(wpos) <= d.range + mi.radius:
+				face(mi.wpos - wpos)
+				if cd <= 0.0:
+					cd = attack_cd
+					play_action("attack", 0.5)
+					if randf() < 0.75:
+						mi.take_hit(roundi(randi_range(dmg[0], dmg[1]) * dmg_mult()))
+				return
 	repath -= dt
 	if repath <= 0.0 or path.is_empty():
 		if sees and dist < 3.0:
@@ -235,7 +324,7 @@ func _melee(player: Player) -> void:
 		return
 	if player.try_block():
 		return
-	var amount := randi_range(dmg[0], dmg[1])
+	var amount := roundi(randi_range(dmg[0], dmg[1]) * dmg_mult())
 	var e := elem()
 	if e == "fire" or e == "cold":
 		# enchanted: the hit carries the element on top of the blow
@@ -247,10 +336,12 @@ func _melee(player: Player) -> void:
 		player.mp = maxf(0.0, player.mp - amount * 1.5)
 
 
-## Topple, sink and fade, then free.
+## Topple and lie as a corpse for a while, then fade and free.
 func die() -> void:
 	dead = true
 	dying = 0.9
+	corpse_t = 45.0
+	dot_t = 0.0
 	highlighted = false
 	z_index = -1
 	if light:
@@ -262,10 +353,10 @@ func _animate_death(dt: float) -> void:
 	dying -= dt
 	var t := 1.0 - dying / 0.9
 	death_frame = mini(7, int(t * 1.6 * 8.0))
-	modulate = Color(0.75, 0.7, 0.7, clampf(dying * 2.5, 0.0, 1.0))
+	modulate = Color(0.75, 0.7, 0.7).lerp(Color(0.55, 0.5, 0.5), t)
 	queue_redraw()
 	if dying <= 0.0:
-		queue_free()
+		main.add_corpse(self)
 
 
 # ---------- drawing ----------

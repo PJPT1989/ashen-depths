@@ -1,7 +1,7 @@
 extends CanvasLayer
 ## Everything on screen that isn't the world: orbs, belt and skill bar, target bar, messages,
-## the character panel (C), the inventory (I), trading, waypoints, the automap, and the title
-## and death screens. Built in code so it is easy to restyle.
+## the character panel (C), the skills panel (S), the inventory (I), trading, waypoints, the
+## automap, and the title and death screens. Built in code so it is easy to restyle.
 
 const BONE := Color("ddd3c0")
 const MUTED := Color("8f8575")
@@ -17,8 +17,13 @@ var mana_orb: Orb
 var xp_bar: ProgressBar
 var hp_btn: Button
 var mp_btn: Button
-var nova_btn: Button
+var skill_btns: Array = []     # SkillButton per hotbar slot
 var stat_btn: Button
+var skills_panel: PanelContainer
+var skills_title: Label
+var skill_rows: Array = []     # per slot: {pick: OptionButton, rune: OptionButton, desc: Label}
+var passive_rows: Array = []   # per passive slot: {pick: OptionButton, desc: Label}
+var skills_hint: Label
 var level_lbl: Label
 var area_lbl: Label
 var gold_lbl: Label
@@ -57,6 +62,28 @@ var char_title: Label
 var dead_screen: Control
 
 
+## A hotbar slot: skill name, its key, a strip in its element's colour, and a shade that
+## shrinks as the cooldown runs out. Dim when the hero can't pay for it.
+class SkillButton extends Button:
+	var hud
+	var slot := 0
+	func _process(_dt: float) -> void:
+		queue_redraw()
+	func _draw() -> void:
+		var p: Player = hud.main.player
+		var id: String = p.bar[slot]
+		if id == "":
+			return
+		var sk := Skills.resolve(id, p.runes.get(id, -1))
+		draw_rect(Rect2(2, 2, size.x - 4, 3), Player.elem_color(sk.get("elem", "phys")) if sk.has("elem") else Skills.RESOURCE[p.cls].color)
+		var cd: float = p.cds.get(id, 0.0)
+		var full: float = sk.get("cd", 0.0) * p.fx.get("cdr", 1.0)
+		if cd > 0.0 and full > 0.0:
+			draw_rect(Rect2(1, 1, size.x - 2, (size.y - 2) * cd / full), Color(0, 0, 0, 0.6))
+		if p.mp < p.skill_cost(sk):
+			draw_rect(Rect2(1, 1, size.x - 2, size.y - 2), Color(0.05, 0.08, 0.3, 0.45))
+
+
 ## Draws the item on the cursor.
 class HeldView extends Control:
 	var hud
@@ -89,6 +116,7 @@ func setup(m) -> void:
 	_build_message()
 	_build_inventory()
 	_build_character()
+	_build_skills()
 	_build_trade()
 	_build_waypoints()
 	_build_dialog()
@@ -191,7 +219,7 @@ func _build_bottom_bar() -> void:
 
 	var panel := PanelContainer.new()
 	panel.size_flags_vertical = Control.SIZE_SHRINK_END
-	panel.custom_minimum_size = Vector2(640, 0)
+	panel.custom_minimum_size = Vector2(900, 0)
 	bar.add_child(panel)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 6)
@@ -203,22 +231,34 @@ func _build_bottom_bar() -> void:
 	col.add_child(xp_bar)
 	var slots := HBoxContainer.new()
 	slots.alignment = BoxContainer.ALIGNMENT_CENTER
-	slots.add_theme_constant_override("separation", 6)
+	slots.add_theme_constant_override("separation", 5)
 	col.add_child(slots)
 	hp_btn = _button("", func(): main.player.drink("hp"))
 	mp_btn = _button("", func(): main.player.drink("mp"))
 	hp_btn.add_theme_color_override("font_color", Color("ff7b7b"))
 	mp_btn.add_theme_color_override("font_color", Color("9db0ff"))
-	var fire_btn := _button("Fireball\nR-click · F", func():
-		var t: Monster = main.hovered_monster if main.hovered_monster else main.nearest_foe()
-		main.player.cast_fire(t.wpos if t else main.player.wpos + Vector2(main.player.fdir, -main.player.fdir)))
-	nova_btn = _button("", func(): main.player.cast_nova())
-	stat_btn = _button("Character\nC", toggle_char)
-	var bag_btn := _button("Inventory\nI", toggle_inv)
+	for b in [hp_btn, mp_btn]:
+		b.custom_minimum_size = Vector2(62, 44)
+		slots.add_child(b)
+	for i in Skills.SLOT_KEYS.size():
+		var sb := SkillButton.new()
+		sb.hud = self
+		sb.slot = i
+		sb.focus_mode = Control.FOCUS_NONE
+		sb.custom_minimum_size = Vector2(86, 44)
+		sb.add_theme_font_size_override("font_size", 12)
+		sb.pressed.connect(func(): toggle_skills(true))
+		sb.mouse_entered.connect(func(): _skill_tip(i))
+		sb.mouse_exited.connect(hide_tip)
+		slots.add_child(sb)
+		skill_btns.append(sb)
+	stat_btn = _button("Char\nC", toggle_char)
+	var sk_btn := _button("Skills\nS", func(): toggle_skills())
+	var bag_btn := _button("Bag\nI", toggle_inv)
 	var map_btn := _button("Map\nTab", toggle_map)
 	var tp_btn := _button("Portal\nT", func(): main.open_town_portal())
-	for b in [hp_btn, mp_btn, fire_btn, nova_btn, stat_btn, bag_btn, map_btn, tp_btn]:
-		b.custom_minimum_size = Vector2(72, 44)
+	for b in [stat_btn, sk_btn, bag_btn, map_btn, tp_btn]:
+		b.custom_minimum_size = Vector2(54, 44)
 		slots.add_child(b)
 	var info := HBoxContainer.new()
 	col.add_child(info)
@@ -306,9 +346,10 @@ func _build_inventory() -> void:
 # ---------- character ----------
 
 const STAT_NAMES := {"str": "Strength", "dex": "Dexterity", "vit": "Vitality", "ene": "Energy"}
-const STAT_HELP := {"str": "+1% weapon damage", "dex": "+5 attack rating, block", "vit": "+3 life", "ene": "+2 mana"}
+const STAT_HELP := {"str": "+1% weapon damage", "dex": "+5 attack rating, block", "vit": "+%d life", "ene": "+%d mana"}
 const DERIVED := ["Damage", "Attack Rating", "Chance to Hit", "Defense", "Chance to Block", "Attacks per Second", "Life", "Mana",
-	"Fire Resist", "Cold Resist", "Lightning Resist", "Poison Resist", "Run Speed", "Magic Find", "Fireball"]
+	"Fire Resist", "Cold Resist", "Lightning Resist", "Poison Resist", "Run Speed", "Magic Find", "Spell Damage"]
+var char_help := {}
 
 
 func _build_character() -> void:
@@ -343,7 +384,8 @@ func _build_character() -> void:
 		plus.custom_minimum_size = Vector2(28, 26)
 		g.add_child(plus)
 		char_plus[k] = plus
-		g.add_child(_label(STAT_HELP[k], 12, MUTED))
+		char_help[k] = _label(STAT_HELP[k], 12, MUTED)
+		g.add_child(char_help[k])
 	char_points = _label("", 15, Color("f2d25c"))
 	v.add_child(char_points)
 	v.add_child(HSeparator.new())
@@ -353,7 +395,9 @@ func _build_character() -> void:
 	d.add_theme_constant_override("v_separation", 1)
 	v.add_child(d)
 	for k in DERIVED:
-		d.add_child(_label(k, 14, MUTED))
+		var name_lbl := _label(k, 14, MUTED)
+		char_vals[k + "_name"] = name_lbl
+		d.add_child(name_lbl)
 		var val := _label("", 14)
 		val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		val.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -364,7 +408,11 @@ func _build_character() -> void:
 func _refresh_character() -> void:
 	var p: Player = main.player
 	var s: Dictionary = p.st
-	char_title.text = Player.CLASSES[p.cls].name
+	var c: Dictionary = Player.CLASSES[p.cls]
+	char_title.text = c.name
+	char_help.vit.text = "+%d life" % c.life_vit
+	char_help.ene.text = ("+%d mana" % c.mana_ene) if p.cls != "ajani" else "no effect on Ferocity"
+	char_vals["Mana_name"].text = Skills.RESOURCE[p.cls].name
 	char_head.text = "Level %d" % p.level
 	char_xp.text = "Experience %d / %d" % [p.xp, Player.xp_needed(p.level)]
 	for k in STAT_NAMES:
@@ -383,10 +431,180 @@ func _refresh_character() -> void:
 		"Life": "%d / %d" % [ceili(p.hp), s.max_hp], "Mana": "%d / %d" % [floori(p.mp), s.max_mp],
 		"Fire Resist": "%d%%" % s.res_fire, "Cold Resist": "%d%%" % s.res_cold, "Lightning Resist": "%d%%" % s.res_lit,
 		"Poison Resist": "%d%%" % s.res_pois, "Run Speed": "+%d%%" % roundi((s.speed / Player.SPEED - 1.0) * 100),
-		"Magic Find": "%d%%" % s.mf, "Fireball": "%d-%d" % [s.fire[0], s.fire[1]],
+		"Magic Find": "%d%%" % s.mf, "Spell Damage": "%d-%d" % [s.spell_dmg[0], s.spell_dmg[1]],
 	}
 	for k in vals:
 		char_vals[k].text = vals[k]
+
+
+# ---------- skills ----------
+
+func _build_skills() -> void:
+	skills_panel = PanelContainer.new()
+	skills_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	skills_panel.position = Vector2(16, 16)
+	skills_panel.custom_minimum_size = Vector2(600, 0)
+	skills_panel.visible = false
+	root.add_child(skills_panel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 4)
+	skills_panel.add_child(v)
+	skills_title = _panel_head(v, "Skills", func(): toggle_skills(false))
+	for i in Skills.SLOT_KEYS.size():
+		var h := HBoxContainer.new()
+		h.add_theme_constant_override("separation", 8)
+		v.add_child(h)
+		var key := _label(["Left click", "Right click", "Key 1", "Key 2", "Key 3", "Key 4"][i], 14, GOLD, Game.font_bold)
+		key.custom_minimum_size = Vector2(84, 0)
+		h.add_child(key)
+		var pick := OptionButton.new()
+		pick.focus_mode = Control.FOCUS_NONE
+		pick.custom_minimum_size = Vector2(250, 0)
+		pick.item_selected.connect(func(idx): _pick_skill(i, idx))
+		h.add_child(pick)
+		var rune := OptionButton.new()
+		rune.focus_mode = Control.FOCUS_NONE
+		rune.custom_minimum_size = Vector2(230, 0)
+		rune.item_selected.connect(func(idx): _pick_rune(i, idx))
+		h.add_child(rune)
+		var desc := _label("", 12, MUTED)
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc.custom_minimum_size = Vector2(580, 0)
+		v.add_child(desc)
+		skill_rows.append({"pick": pick, "rune": rune, "desc": desc})
+	v.add_child(HSeparator.new())
+	v.add_child(_label("Passives", 18, GOLD, Game.font_display))
+	for i in Skills.PASSIVE_SLOTS.size():
+		var h := HBoxContainer.new()
+		h.add_theme_constant_override("separation", 8)
+		v.add_child(h)
+		var pick := OptionButton.new()
+		pick.focus_mode = Control.FOCUS_NONE
+		pick.custom_minimum_size = Vector2(250, 0)
+		pick.item_selected.connect(func(idx): _pick_passive(i, idx))
+		h.add_child(pick)
+		var desc := _label("", 12, MUTED)
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		h.add_child(desc)
+		passive_rows.append({"pick": pick, "desc": desc})
+	skills_hint = _label("New skills, runes and passives unlock as you gain levels. A rune changes how its skill works.", 12, MUTED)
+	skills_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	skills_hint.custom_minimum_size = Vector2(580, 0)
+	v.add_child(skills_hint)
+
+
+## Fill the lists from the hero: unlocked choices are enabled, locked ones show their level.
+func _refresh_skills() -> void:
+	var p: Player = main.player
+	var hero := p.cls
+	skills_title.text = "Skills · %s" % Player.CLASSES[hero].name
+	var cats: Array = Skills.CATEGORIES[hero]
+	for i in skill_rows.size():
+		var row: Dictionary = skill_rows[i]
+		var pick: OptionButton = row.pick
+		pick.clear()
+		pick.add_item("(empty)")
+		pick.set_item_metadata(0, "")
+		var sel := 0
+		for id in Skills.of_hero(hero):
+			var sk: Dictionary = Skills.SKILLS[id]
+			var n := pick.item_count
+			pick.add_item("%s: %s%s" % [cats[sk.cat], sk.name, "" if p.level >= sk.lvl else "  (level %d)" % sk.lvl])
+			pick.set_item_metadata(n, id)
+			pick.set_item_disabled(n, p.level < sk.lvl)
+			if p.bar[i] == id:
+				sel = n
+		pick.select(sel)
+		var rune: OptionButton = row.rune
+		rune.clear()
+		var id: String = p.bar[i]
+		if id == "":
+			rune.disabled = true
+			row.desc.text = ""
+			continue
+		rune.disabled = false
+		rune.add_item("No rune")
+		var sk: Dictionary = Skills.SKILLS[id]
+		for r in sk.runes:
+			var n := rune.item_count
+			rune.add_item("%s%s" % [r.name, "" if p.level >= r.lvl else "  (level %d)" % r.lvl])
+			rune.set_item_disabled(n, p.level < r.lvl)
+		var cur: int = p.runes.get(id, -1)
+		rune.select(cur + 1)
+		row.desc.text = _skill_text(id, cur)
+	var open := Skills.passive_slots(p.level)
+	for i in passive_rows.size():
+		var row: Dictionary = passive_rows[i]
+		var pick: OptionButton = row.pick
+		pick.clear()
+		if i >= open:
+			pick.add_item("Opens at level %d" % Skills.PASSIVE_SLOTS[i])
+			pick.disabled = true
+			row.desc.text = ""
+			continue
+		pick.disabled = false
+		pick.add_item("(empty)")
+		pick.set_item_metadata(0, "")
+		var cur: String = p.passives[i] if i < p.passives.size() else ""
+		var sel := 0
+		for id in Skills.passives_of(p.cls):
+			var ps: Dictionary = Skills.PASSIVES[id]
+			var n := pick.item_count
+			pick.add_item("%s%s" % [ps.name, "" if p.level >= ps.lvl else "  (level %d)" % ps.lvl])
+			pick.set_item_metadata(n, id)
+			pick.set_item_disabled(n, p.level < ps.lvl or (id in p.passives and id != cur))
+			if id == cur:
+				sel = n
+		pick.select(sel)
+		row.desc.text = Skills.PASSIVES[cur].desc if cur != "" else ""
+
+
+func _pick_skill(i: int, idx: int) -> void:
+	main.player.set_slot(i, skill_rows[i].pick.get_item_metadata(idx))
+	_refresh_skills()
+
+
+func _pick_rune(i: int, idx: int) -> void:
+	var id: String = main.player.bar[i]
+	if id != "":
+		main.player.set_rune(id, idx - 1)
+	_refresh_skills()
+
+
+func _pick_passive(i: int, idx: int) -> void:
+	main.player.set_passive(i, passive_rows[i].pick.get_item_metadata(idx))
+	_refresh_skills()
+
+
+## What a skill does with rune r, its cost and cooldown.
+func _skill_text(id: String, r: int) -> String:
+	var sk: Dictionary = Skills.SKILLS[id]
+	var t: String = sk.desc
+	if r >= 0:
+		t += " Rune %s: %s" % [sk.runes[r].name, sk.runes[r].desc]
+	var s := Skills.resolve(id, r)
+	var bits: Array = []
+	if s.get("cd", 0) > 0:
+		bits.append("cooldown %ss" % str(s.cd))
+	if s.get("gen", 0) > 0:
+		bits.append("builds %d" % s.gen)
+	if not bits.is_empty():
+		t += " (" + ", ".join(bits) + ")"
+	return t
+
+
+func _skill_tip(i: int) -> void:
+	var p: Player = main.player
+	var id: String = p.bar[i]
+	if id == "":
+		tip_text.text = "[center][b]Empty slot[/b][/center]\nClick to choose a skill."
+	else:
+		var r: int = p.runes.get(id, -1)
+		var head: String = Skills.SKILLS[id].name + ("  ·  " + Skills.SKILLS[id].runes[r].name if r >= 0 else "")
+		tip_text.text = "[center][b]%s[/b][/center]\n%s\n[color=#8f8575]Click to change.[/color]" % [head, _skill_text(id, r)]
+	tip.visible = true
+	tip.reset_size()
 
 
 # ---------- trade, waypoints, talk ----------
@@ -534,6 +752,8 @@ func refresh() -> void:
 		trade_view.queue_redraw()
 	if char_panel.visible:
 		_refresh_character()
+	if skills_panel.visible:
+		_refresh_skills()
 
 
 func toggle_inv(force = null) -> void:
@@ -548,7 +768,16 @@ func toggle_char(force = null) -> void:
 	char_panel.visible = (not char_panel.visible) if force == null else force
 	if char_panel.visible:
 		trade_panel.visible = false
+		skills_panel.visible = false
 	refresh()
+
+
+func toggle_skills(force = null) -> void:
+	skills_panel.visible = (not skills_panel.visible) if force == null else force
+	if skills_panel.visible:
+		char_panel.visible = false
+		trade_panel.visible = false
+		_refresh_skills()
 
 
 func toggle_map() -> void:
@@ -558,6 +787,7 @@ func toggle_map() -> void:
 func close_panels() -> void:
 	inv_panel.visible = false
 	char_panel.visible = false
+	skills_panel.visible = false
 	trade_panel.visible = false
 	wp_panel.visible = false
 	dialog.visible = false
@@ -602,10 +832,10 @@ func _build_title() -> Control:
 	var kc := CenterContainer.new()
 	kc.add_child(keys)
 	v.add_child(kc)
-	for row in [["Left click", "Walk, attack, talk, pick up (hold to keep walking)"], ["Right click / F", "Fireball toward the cursor"],
-			["Space", "Frost Nova (learned at level 3)"], ["1 · 2", "Drink healing or mana draught"],
-			["C · I · Tab", "Character, inventory, map"], ["T", "Open a town portal"], ["M", "Sound"],
-			["L", "Graphics quality: low, medium, high"]]:
+	for row in [["Left click", "Walk; on a foe, use your left-click skill"], ["Right click", "Use your right-click skill"],
+			["1 · 2 · 3 · 4", "Use the skills on those keys"], ["Q · W", "Drink healing or mana draught"],
+			["S", "Skills: choose skills, runes, passives"], ["C · I · Tab", "Character, inventory, map"],
+			["T · M", "Town portal, sound"], ["L", "Graphics quality: low, medium, high"]]:
 		keys.add_child(_label(row[0], 14, BONE, Game.font_bold))
 		keys.add_child(_label(row[1], 14, MUTED))
 	var goal := _label("Cross the eight areas of Act I. Each one ends with a boss who seals the way on.", 16)
@@ -746,14 +976,20 @@ func _process(dt: float) -> void:
 	life_orb.queue_redraw()
 	mana_orb.fraction = p.mp / s.max_mp
 	mana_orb.text = "%d/%d" % [floori(p.mp), s.max_mp]
+	var rc: Color = Skills.RESOURCE[p.cls].color
+	mana_orb.top_color = rc
+	mana_orb.deep_color = rc.darkened(0.85)
 	mana_orb.queue_redraw()
 	xp_bar.max_value = Player.xp_needed(p.level)
 	xp_bar.value = p.xp
-	hp_btn.text = "%d/%d\nHeal · 1" % [p.belt.hp, s.belt_cap]
-	mp_btn.text = "%d/%d\nMana · 2" % [p.belt.mp, s.belt_cap]
-	nova_btn.text = "Frost Nova\n" + ("Level 3" if p.level < 3 else "Space · 12")
-	nova_btn.modulate.a = 0.45 if p.level < 3 else 1.0
-	stat_btn.text = "Character\n" + ("+%d points" % p.stat_points if p.stat_points > 0 else "C")
+	hp_btn.text = "%d/%d\nHeal · Q" % [p.belt.hp, s.belt_cap]
+	mp_btn.text = "%d/%d\nMana · W" % [p.belt.mp, s.belt_cap]
+	for i in skill_btns.size():
+		var id: String = p.bar[i]
+		var key: String = ["Left", "Right", "1", "2", "3", "4"][i]
+		skill_btns[i].text = ("%s\n%s" % [Skills.SKILLS[id].name, key]) if id != "" else "empty\n" + key
+		skill_btns[i].modulate.a = 1.0 if id != "" else 0.5
+	stat_btn.text = "Char\n" + ("+%d" % p.stat_points if p.stat_points > 0 else "C")
 	stat_btn.modulate = Color(1.3, 1.15, 0.6) if p.stat_points > 0 and fmod(Time.get_ticks_msec() / 600.0, 2.0) < 1.0 else Color.WHITE
 	level_lbl.text = "Level %d" % p.level
 	area_lbl.text = Act.area(main.area).name
