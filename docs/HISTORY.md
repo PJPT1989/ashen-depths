@@ -137,7 +137,7 @@ textured floor and wall tiles, but in Godot 4.3's compatibility renderer lit `dr
 > I want to have viable options even for people with faster set up. Can we put there options so
 > that if someone can afford better visuals they can run it like that?
 
-The switch became three levels, cycled with L or the title screen button and remembered: **High**
+The switch became three levels, cycled with L or the title screen button (Low, Medium, High) and remembered: **High**
 (full resolution and the blurred bloom, the desktop default; in the browser the bloom is
 `post_bloom_web.gdshader`, the round 6 web shader), **Medium** (round 8's base-size drawing and
 in-place bloom, the browser's default, shader renamed `post_medium.gdshader`) and **Low** (round 9).

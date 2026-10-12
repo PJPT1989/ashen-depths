@@ -736,7 +736,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		Game.muted = not Game.muted
 		floater(player.wpos, "Sound off" if Game.muted else "Sound on", Color("bbbbbb"))
 	elif event.is_action_pressed("toggle_quality"):
-		Game.set_quality((Game.quality + 2) % 3)  # high -> medium -> low -> high
+		Game.set_quality((Game.quality + 1) % 3)  # low -> medium -> high -> low
 		floater(player.wpos, "%s quality" % Game.QUALITY_NAMES[Game.quality], Color("bbbbbb"))
 	elif event.is_action_pressed("close"):
 		hud.close_panels()
