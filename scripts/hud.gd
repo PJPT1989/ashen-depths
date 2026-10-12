@@ -601,7 +601,8 @@ func _build_title() -> Control:
 	v.add_child(kc)
 	for row in [["Left click", "Walk, attack, talk, pick up (hold to keep walking)"], ["Right click / F", "Fireball toward the cursor"],
 			["Space", "Frost Nova (learned at level 3)"], ["1 · 2", "Drink healing or mana draught"],
-			["C · I · Tab", "Character, inventory, map"], ["T", "Open a town portal"], ["M", "Sound"]]:
+			["C · I · Tab", "Character, inventory, map"], ["T", "Open a town portal"], ["M", "Sound"],
+			["L", "Graphics quality: low, medium, high"]]:
 		keys.add_child(_label(row[0], 14, BONE, Game.font_bold))
 		keys.add_child(_label(row[1], 14, MUTED))
 	var goal := _label("Cross the eight areas of Act I. Each one ends with a boss who seals the way on.", 16)
@@ -613,6 +614,16 @@ func _build_title() -> Control:
 	var bc := CenterContainer.new()
 	bc.add_child(go)
 	v.add_child(bc)
+	var q := _button("", func(): Game.set_quality((Game.quality + 1) % 3))
+	q.add_theme_font_size_override("font_size", 14)
+	q.add_theme_color_override("font_color", MUTED)
+	q.flat = true
+	var show_q := func(): q.text = "Quality: %s (L)" % ["low, for slow computers", "medium", "high, for fast computers"][Game.quality]
+	show_q.call()
+	Game.quality_changed.connect(show_q)
+	var qc := CenterContainer.new()
+	qc.add_child(q)
+	v.add_child(qc)
 	return o
 
 

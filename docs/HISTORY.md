@@ -105,3 +105,41 @@ build to his own site; rebuild with `tools/export_web.sh`.
 The project moved from a Claude project's shared folder into this repository so any Claude Code
 session can continue it. Added `CLAUDE.md`, this file, the `tools/*.sh` helpers and the cloud
 SessionStart hook. Built zips are not kept in git; regenerate them with the scripts.
+
+## 8. On the Tomano shop, and a faster web build (2026-10-12)
+> I want to add that game to my eshop, under section games
+> is there a way how to improve performance? all the movement seems very "laggy"
+
+The web build now runs on www.tomano.cz under "Hry" (the shop repo copies `build/web` with its
+`tools/game_import.py`). Movement felt laggy because the browser frame rate was low. Added
+`scripts/bench.gd` (`-- --bench [--web] [--area=N] [--off=...]`) to measure what costs what: the
+web bloom (16 screen samples per pixel) took about 40% of the frame, and drawing at the screen's
+full resolution (high-DPI and full screen multiply the pixels) most of the rest. The web build
+(`Main.web`, or `-- --web` on desktop) now draws at the base 1280x800 size and scales up, and
+`post_web.gdshader` brightens highlights in place instead of blurring. About 3x the frame rate in
+the benchmark at 1920x1080 (moor 3.2 -> 10.1 fps in software rendering); the desktop build is unchanged.
+
+## 9. Low quality switch (2026-10-12)
+> yes, my particular laptop is very slow... add that feature in there pls
+
+**L** (or the "Quality" button on the title screen) switches low quality on and off; the choice is
+saved in `user://settings.cfg`. Low quality turns off shadows, merges each shadowed light pair into
+one light, drops monster glow lights and normal maps, swaps the finishing pass for
+`post_low.gdshader` (vignette and hurt pulse only) and hides the drifting embers. In the browser,
+if the first five seconds of play average under 24 fps and the player hasn't chosen, the game
+switches to low quality once and says how to switch back. Benchmark (`--web --low`): about 15%
+faster in open areas and 45% in dungeons on top of round 8. Also turned off SDF generation on
+light occluders (unused) and drew small prop polygons with `draw_primitive`. Tried the same for
+textured floor and wall tiles, but in Godot 4.3's compatibility renderer lit `draw_primitive` and
+`draw_mesh` broke the normal-mapped lighting, so those stay `draw_polygon`.
+
+## 10. Low, Medium and High quality (2026-10-12)
+> I want to have viable options even for people with faster set up. Can we put there options so
+> that if someone can afford better visuals they can run it like that?
+
+The switch became three levels, cycled with L or the title screen button (Low, Medium, High) and remembered: **High**
+(full resolution and the blurred bloom, the desktop default; in the browser the bloom is
+`post_bloom_web.gdshader`, the round 6 web shader), **Medium** (round 8's base-size drawing and
+in-place bloom, the browser's default, shader renamed `post_medium.gdshader`) and **Low** (round 9).
+The browser still drops to Low by itself once if the first seconds are slow and nobody chose. The
+smoke test and benchmark (`--quality=0|1|2`) never save the setting.

@@ -32,6 +32,9 @@ made so far and what was built for it; read it before planning bigger work.
 - `tools/export_web.sh` builds the browser version into `build/web/` (git-ignored, about 65 MB). It
   uses the no-threads web template, so any HTTPS host works without special headers. Petr hosts it on
   his own website; give him the folder as a zip.
+- Frame rate: `xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1920x1080 -- --bench --area=1`
+  (add `--web` for the browser build's settings, `--off=post,lights,...` to see what something costs).
+  Software rendering, so compare runs with each other, never with real hardware.
 - Static check without running: `godot --headless --path . --check-only --script res://scripts/x.gd`.
 
 ## Art pipeline
@@ -71,8 +74,12 @@ Everything visual is generated from code; there are no hand-made image assets.
 - Data lives in `const` dictionaries/arrays near the top of the script that owns it (`Act.AREAS`,
   item bases and affixes in `items.gd`, monster kinds in `monster.gd`).
 - Most nodes are built in code rather than in `.tscn` files; follow that.
-- The web build swaps `shaders/post.gdshader` for `post_web.gdshader` (`OS.has_feature("web")` in
-  `main.gd`) because the bloom pass broke in WebGL. Test web-facing changes with `tools/export_web.sh`
+- Graphics quality `Game.quality` (LOW, MEDIUM, HIGH; L cycles it, saved in `user://settings.cfg`,
+  applied in `Main._apply_quality`). HIGH: full resolution, `post.gdshader` (`post_bloom_web.gdshader`
+  in the browser, which has no screen mipmaps). MEDIUM (the browser's default): base 1280x800 scaled up,
+  `post_medium.gdshader`. LOW: also drops shadows, light twins, monster lights, normal maps and embers,
+  `post_low.gdshader`; lights made with `Game.make_light_pair` follow it automatically. The web build
+  (`Main.web`: `OS.has_feature("web")` or `-- --web`) drops to LOW once by itself if play starts slow. Test web-facing changes with `tools/export_web.sh`
   and a headless Chromium load (Playwright is preinstalled in cloud sessions).
 
 ## Known gaps and ideas Petr was offered

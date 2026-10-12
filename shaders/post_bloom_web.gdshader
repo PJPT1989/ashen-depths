@@ -1,4 +1,5 @@
-// Web version of post.gdshader: same look, but the bloom samples without screen mipmaps (WebGL cannot build them).
+// High quality in the browser: post.gdshader's bloom without screen mipmaps (WebGL cannot build
+// them), sampled in a wide ring instead. Costly; for fast computers.
 // vignette, film grain, and a red pulse at the edges when the hero is hurt.
 shader_type canvas_item;
 

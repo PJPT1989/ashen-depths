@@ -52,6 +52,8 @@ var braziers: Array = []
 var shake_amount := 0.0
 var hurt_flash := 0.0
 var post: ShaderMaterial
+var ambient: Array = []       # drifting embers and dust, off in low quality
+var fps_check := [0.0, 0]     # first seconds of play in the browser: [time, frames]
 var flat: Node2D          # flat things on the ground (waypoints, stairs down), under the world
 
 var area_seeds: Array = []
@@ -59,6 +61,9 @@ var area_state: Array = []    # per area: visited, waypoint, killed {uid: true},
 var tp = null                 # the open town portal: {"area": i, "wpos": Vector2}
 var stock := {"vendor": [], "healer": []}
 var bosses_killed := 0
+## The browser build (or `-- --web` on desktop, to test it): starts at medium quality, uses the
+## mipmap-free bloom at high, and drops to low by itself if the first seconds run slowly.
+var web := OS.has_feature("web") or "--web" in OS.get_cmdline_user_args()
 
 
 func _ready() -> void:
@@ -75,6 +80,10 @@ func _ready() -> void:
 		var t := preload("res://scripts/autotest.gd").new()
 		t.main = self
 		add_child(t)
+	elif "--bench" in OS.get_cmdline_user_args():
+		var b := preload("res://scripts/bench.gd").new()
+		b.main = self
+		add_child(b)
 
 
 func new_game() -> void:
@@ -726,6 +735,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("toggle_sound"):
 		Game.muted = not Game.muted
 		floater(player.wpos, "Sound off" if Game.muted else "Sound on", Color("bbbbbb"))
+	elif event.is_action_pressed("toggle_quality"):
+		Game.set_quality((Game.quality + 1) % 3)  # low -> medium -> high -> low
+		floater(player.wpos, "%s quality" % Game.QUALITY_NAMES[Game.quality], Color("bbbbbb"))
 	elif event.is_action_pressed("close"):
 		hud.close_panels()
 
@@ -820,6 +832,7 @@ func _process(dt: float) -> void:
 	if state != "play":
 		return
 	no_mana_timer -= dt
+	_check_speed(dt)
 	_update_hover()
 	if mouse_held and player.target_monster == null and player.target_obj == null:
 		hold_timer -= dt
@@ -842,6 +855,24 @@ func _process(dt: float) -> void:
 		if o.kind == "waypoint" and not o.active and o.wpos.distance_to(player.wpos) < 2.0:
 			_activate_waypoint(o)
 	_separate()
+
+
+## In the browser, if the first seconds of play run slowly and the player hasn't chosen a
+## quality yet, switch to low quality once and say how to switch back.
+func _check_speed(dt: float) -> void:
+	if not web or Game.low_quality or Game.quality_chosen or fps_check[0] < 0.0:
+		return
+	fps_check[0] += dt
+	if fps_check[0] < 3.0:
+		return
+	fps_check[1] += 1
+	if fps_check[0] < 8.0:
+		return
+	var fps: float = fps_check[1] / (fps_check[0] - 3.0)
+	fps_check[0] = -1.0
+	if fps < 24.0:
+		Game.set_quality(Game.LOW, false)
+		show_msg("Low quality", "The game was running slowly, so shadows and effects are off. Press L to change it.", 6.0)
 
 
 ## Push overlapping monsters apart, and off the hero.
@@ -898,9 +929,23 @@ func _build_post() -> void:
 	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	post = ShaderMaterial.new()
-	post.shader = load("res://shaders/post_web.gdshader" if OS.has_feature("web") else "res://shaders/post.gdshader")
 	rect.material = post
 	layer.add_child(rect)
+	Game.quality_changed.connect(_apply_quality)
+
+
+## Picks the resolution, finishing pass and ambient particles for the current quality.
+func _apply_quality() -> void:
+	# below high, draw at the base size and scale up: far fewer pixels on big or sharp screens
+	get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS if Game.quality == Game.HIGH \
+		else Window.CONTENT_SCALE_MODE_VIEWPORT
+	match Game.quality:
+		Game.LOW: post.shader = load("res://shaders/post_low.gdshader")
+		Game.MEDIUM: post.shader = load("res://shaders/post_medium.gdshader")
+		_: post.shader = load("res://shaders/post_bloom_web.gdshader" if web else "res://shaders/post.gdshader")
+	for p in ambient:
+		p.visible = not Game.low_quality
+		p.emitting = not Game.low_quality
 
 
 func _build_ambient() -> void:
@@ -913,6 +958,7 @@ func _build_ambient() -> void:
 	embers.spread = 60.0
 	embers.local_coords = false
 	camera.add_child(embers)
+	ambient.append(embers)
 	var dust := CPUParticles2D.new()
 	dust.amount = 70
 	dust.lifetime = 8.0
@@ -931,6 +977,8 @@ func _build_ambient() -> void:
 	g.colors = PackedColorArray([Color(1, 1, 1, 0), Color(0.9, 0.85, 0.75, 0.5), Color(0.9, 0.85, 0.75, 0.5), Color(1, 1, 1, 0)])
 	dust.color_ramp = g
 	camera.add_child(dust)
+	ambient.append(dust)
+	_apply_quality()
 
 
 func _update_camera_fx(dt: float) -> void:
