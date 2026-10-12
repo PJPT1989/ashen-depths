@@ -1,0 +1,203 @@
+extends Node
+## Smoke test, enabled with:  godot --path . -- --autotest [--shots=/some/dir]
+## Walks through the town, the panels and every area of Act I, fights a little, kills a boss,
+## dies, saves screenshots, prints a summary and quits. Not used in normal play.
+
+var main
+var t := 0.0
+var shots_dir := ""
+var steps: Array = []
+var step_i := 0
+var wait := 0.0
+var fight_until := 0.0
+
+
+func _ready() -> void:
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--shots="):
+			shots_dir = a.substr(8)
+	main.hud.title_screen.visible = false
+	main.start_game()
+	steps = [
+		[1.5, func():
+			print("AUTOTEST town fps %d, nodes %d" % [Engine.get_frames_per_second(), get_tree().get_node_count()])
+			_shot("town")],
+		[0.5, func(): _fill_inventory()],
+		[0.8, func():
+			_shot("inventory")
+			_click_test()],
+		[0.3, func():
+			main.hud.close_panels()
+			main.use_object(_npc("vendor"))],
+		[0.8, func(): _shot("trade")],
+		[0.3, func():
+			main.hud.close_panels()
+			main.waypoint_travel(0)
+			main.load_area(1, "start")
+			fight_until = t + 18.0],
+		[18.5, func():
+			print("AUTOTEST moor fight: level %d, xp %d, gold %d, monsters left %d, drops %d" % [main.player.level, main.player.xp, main.player.gold, main.monsters.size(), main.drops.size()])
+			_shot("moor")],
+		[0.5, func():
+			main.hud.toggle_char(true)
+			main.hud.toggle_inv(true)],
+		[0.8, func(): _shot("character")],
+		[0.3, func():
+			main.hud.close_panels()
+			main.hud.toggle_map()],
+		[0.8, func(): _shot("map")],
+		[0.3, func():
+			main.hud.toggle_map()
+			main.open_town_portal()],
+		[0.8, func(): _shot("portal")],
+	]
+	for i in range(2, Act.count()):
+		var ai := i
+		steps.append([0.3, func():
+			main.load_area(ai, "start")
+			fight_until = t + 4.0])
+		steps.append([4.5, func():
+			_report(ai)
+			_shot("area%d_%s" % [ai, Act.area(ai).id])])
+	steps.append([0.3, func():
+		var b: Monster = main.boss
+		main.player.wpos = main.dungeon.boss_spot + Vector2(1.5, 1.5)
+		main.player.sync_position()
+		print("AUTOTEST act boss %s rank %d hp %d" % [b.display_name, b.rank, b.max_hp])])
+	steps.append([1.0, func(): _shot("boss")])
+	steps.append([0.3, func(): main.kill_monster(main.boss)])
+	steps.append([1.0, func():
+		print("AUTOTEST boss dead, exit sealed: %s" % (main.exit_portal.sealed if main.exit_portal else "none"))
+		main.area_state[3].waypoint = true
+		main.hud.show_waypoints()])
+	steps.append([0.6, func(): _shot("waypoints")])
+	steps.append([0.3, func():
+		main.hud.close_panels()
+		main.player.take_hit(99999)])
+	steps.append([1.6, func():
+		print("AUTOTEST death screen visible: %s" % main.hud.dead_screen.visible)
+		main.hud.dead_screen.visible = false
+		main.revive()])
+	steps.append([1.0, func():
+		print("AUTOTEST revived in area %d, hp %d" % [main.area, main.player.hp])
+		print("AUTOTEST done")
+		get_tree().quit()])
+	wait = steps[0][0]
+
+
+func _npc(role: String):
+	for o in main.objects:
+		if o.kind == "npc" and o.role == role:
+			return o
+	return null
+
+
+func _fill_inventory() -> void:
+	var p: Player = main.player
+	for type in ["weapon", "armor", "helm", "boots", "gloves", "belt", "ring", "amulet", "charm", "charm", "charm", "shield"]:
+		var it := Items.make(type, ["normal", "magic", "rare", "unique"].pick_random(), 12)
+		p.auto_place(it)
+	# wear what can be worn so the hero shows his gear
+	for it in p.inv.duplicate():
+		if it.type in ["armor", "helm", "boots", "gloves", "belt"] and p.can_use(it):
+			p.quick_equip(it)
+	p.base.str = 60
+	p.base.dex = 45
+	p.level = 12
+	p.recalc()
+	for it in p.inv.duplicate():
+		if it.type in ["armor", "helm", "boots", "gloves", "belt", "weapon", "shield"]:
+			p.quick_equip(it)
+	print("AUTOTEST gear: %s" % ", ".join(PackedStringArray(Items.EQUIP_SLOTS.map(func(s): return "%s=%s" % [s, p.equip[s].name if p.equip[s] else "-"]))))
+	print("AUTOTEST stats: str %d dex %d life %d def %d ar %d block %d dmg %d-%d" % [p.st.str, p.st.dex, p.st.max_hp, p.st.def, p.st.ar, p.st.block, p.st.dmg_min, p.st.dmg_max])
+	main.hud.toggle_inv(true)
+	main.hud.toggle_char(true)
+
+
+## Drive the inventory grid with synthetic clicks: pick an item up, put it down elsewhere,
+## right-click a charm (nothing happens), then wear a ring with a right-click.
+func _click_test() -> void:
+	var p: Player = main.player
+	var iv: InvView = main.hud.inv_view
+	var it: Dictionary = p.inv[0]
+	var from := Vector2i(it.gx, it.gy)
+	_click(iv, Vector2(it.gx + 0.5, it.gy + 0.5) * InvView.C + Vector2(0, InvView.GRID_Y), MOUSE_BUTTON_LEFT)
+	var picked: bool = p.held == it
+	# find a free spot for it
+	var to := Vector2i(-1, -1)
+	for x in range(9, -1, -1):
+		for y in 4:
+			if to.x < 0 and p.grid_fits(it, x, y):
+				to = Vector2i(x, y)
+	var centre := (Vector2(to) + Vector2(it.w, it.h) / 2.0) * InvView.C + Vector2(0, InvView.GRID_Y)
+	_click(iv, centre, MOUSE_BUTTON_LEFT)
+	print("AUTOTEST click: picked %s, placed %s, moved %s -> %s" % [picked, p.held == null, from, Vector2i(it.gx, it.gy)])
+	for r in p.inv.duplicate():
+		if r.type == "ring":
+			_click(iv, Vector2(r.gx + 0.5, r.gy + 0.5) * InvView.C + Vector2(0, InvView.GRID_Y), MOUSE_BUTTON_RIGHT)
+			print("AUTOTEST right-click ring: worn %s" % (p.equip.ring1 == r or p.equip.ring2 == r))
+			break
+	# drag the helm off and back on through the paper doll
+	var helm = p.equip.helm
+	_click(iv, InvView.SLOT_RECTS.helm.get_center(), MOUSE_BUTTON_LEFT)
+	var off: bool = p.held == helm and p.equip.helm == null
+	_click(iv, InvView.SLOT_RECTS.helm.get_center(), MOUSE_BUTTON_LEFT)
+	print("AUTOTEST helm off %s, back on %s" % [off, p.equip.helm == helm and p.held == null])
+
+
+func _click(iv: Control, pos: Vector2, button: int) -> void:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = button
+	ev.pressed = true
+	ev.position = pos
+	iv._gui_input(ev)
+
+
+func _report(i: int) -> void:
+	var counts := {}
+	var uniques := 0
+	for m in main.monsters:
+		counts[m.display_name] = counts.get(m.display_name, 0) + 1
+		if m.champion:
+			uniques += 1
+	var d: Dungeon = main.dungeon
+	print("AUTOTEST nodes %d, blockers %d" % [get_tree().get_node_count(), main.dungeon.blockers.size()])
+	print("AUTOTEST area %d %s: %dx%d, %d monsters, %d uniques, boss %s (rank %d), fps %d" % [i, Act.area(i).name, d.W, d.H, main.monsters.size(), uniques,
+		main.boss.display_name if main.boss else "-", main.boss.rank if main.boss else 0, Engine.get_frames_per_second()])
+
+
+func _shot(name: String) -> void:
+	if shots_dir == "":
+		return
+	await RenderingServer.frame_post_draw
+	var img := get_viewport().get_texture().get_image()
+	img.save_png(shots_dir.path_join(name + ".png"))
+
+
+func _process(dt: float) -> void:
+	t += dt
+	var p: Player = main.player
+	if not p.dead and step_i < steps.size() - 3:
+		p.hp = p.st.max_hp
+		p.mp = p.st.max_mp
+	if t < fight_until and int(t * 2.5) != int((t - dt) * 2.5):
+		var best: Monster = null
+		var bd := INF
+		for m in main.monsters:
+			if m.is_boss:
+				continue
+			var d: float = m.wpos.distance_to(p.wpos)
+			if d < bd:
+				bd = d; best = m
+		if best and bd < 25.0:
+			p.command_attack(best)
+			if bd < 6.0 and main.dungeon.los(p.wpos, best.wpos):
+				p.cast_fire(best.wpos)
+			if p.level >= 3:
+				p.cast_nova()
+	wait -= dt
+	if wait <= 0.0 and step_i < steps.size():
+		steps[step_i][1].call()
+		step_i += 1
+		if step_i < steps.size():
+			wait = steps[step_i][0]
