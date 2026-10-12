@@ -587,10 +587,10 @@ func _build_title() -> Control:
 	t.add_theme_color_override("font_shadow_color", Color("2a0c04"))
 	t.add_theme_constant_override("shadow_offset_y", 4)
 	v.add_child(t)
-	var sub := _label("Act I · The Lamps of Vell", 26, GOLD, Game.font_display)
+	var sub := _label("Act I · The Black Mire", 26, GOLD, Game.font_display)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(sub)
-	var lore := _label("The lamps of Vell went dark the night the abbey fell silent.\nFrom the last lit town, eight roads lead down into the dark.", 17, Color("c9b99a"))
+	var lore := _label("Sheoldred, the Apocalypse stirs beneath the swamp, and her oil raises the dead.\nFrom Mirewatch, eight roads lead down into the black mire.", 17, Color("c9b99a"))
 	lore.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(lore)
 	var keys := GridContainer.new()
@@ -638,7 +638,7 @@ func _build_dead() -> Control:
 	var t := _label("You have fallen", 84, Color("c22a2a"), Game.font_display)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(t)
-	var s := _label("The dark keeps a tithe of your gold. You wake by the fire in Vell's Hollow.", 17)
+	var s := _label("The mire keeps a tithe of your gold. You wake by the fire in Mirewatch.", 17)
 	s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(s)
 	var bc := CenterContainer.new()

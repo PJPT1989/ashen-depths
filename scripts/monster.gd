@@ -1,27 +1,28 @@
 class_name Monster
 extends Figure
-## A creature of Act I. Fifteen kinds; each comes in ranks 1 to 12. A higher rank means more
+## A creature of Act I. Fifteen kinds, named after black Magic: The Gathering creatures (one
+## name per rank tier); each comes in ranks 1 to 12. A higher rank means more
 ## life, damage, defense and attack rating, a new name and a new colour. Packs sometimes hold
 ## a veteran a rank or two higher; unique sub-bosses and area bosses are higher still.
 
 ## Base numbers are rank 1. names: one per rank tier (ranks 1-3, 4-6, 7-9, 10-12).
 ## shot: missile kind for ranged attackers. elem: element of its attacks.
 const TYPES := {
-	"scrabbler": {"names": ["Scrabbler", "Gnasher", "Pitspawn", "Ashfiend"], "hp": 9, "dmg": [1, 4], "spd": 2.8, "xp": 8, "r": 0.28, "range": 0.95, "cd": 0.9, "blood": "5a0d0d"},
-	"bonewalker": {"names": ["Bonewalker", "Grave Knight", "Ossuary Guard", "Bone Lord"], "hp": 16, "dmg": [2, 6], "spd": 1.9, "xp": 14, "r": 0.3, "range": 1.0, "cd": 1.2, "blood": "6d675a"},
-	"hexcaller": {"names": ["Hexcaller", "Curse Weaver", "Dread Chanter", "Void Prophet"], "hp": 12, "dmg": [2, 6], "spd": 1.6, "xp": 20, "r": 0.3, "range": 6.5, "cd": 2.2, "shot": "hex", "elem": "lit", "blood": "3a1650"},
-	"brute": {"names": ["Tusked Brute", "Gore Hulk", "Pit Ogre", "Doom Brute"], "hp": 34, "dmg": [4, 9], "spd": 1.5, "xp": 30, "r": 0.4, "range": 1.15, "cd": 1.6, "blood": "4a0a0a"},
-	"warden": {"names": ["Gravewarden", "Tomb Warden", "Crypt Colossus", "Lampless Warden"], "hp": 40, "dmg": [5, 10], "spd": 1.9, "xp": 38, "r": 0.45, "range": 1.3, "cd": 1.4, "blood": "10252a"},
-	"rotling": {"names": ["Rotling", "Plague Walker", "Bloated Dead", "Carrion Lord"], "hp": 18, "dmg": [2, 5], "spd": 1.1, "xp": 12, "r": 0.32, "range": 1.0, "cd": 1.5, "blood": "3e4a1c"},
-	"gloomhound": {"names": ["Gloomhound", "Dusk Jackal", "Night Stalker", "Hellhound"], "hp": 11, "dmg": [2, 5], "spd": 3.6, "xp": 11, "r": 0.32, "range": 1.0, "cd": 1.0, "blood": "4a0d0d"},
-	"quillback": {"names": ["Quillback", "Spike Fiend", "Thorn Rat", "Razorspine"], "hp": 13, "dmg": [1, 4], "spd": 2.2, "xp": 13, "r": 0.3, "range": 5.5, "cd": 1.8, "shot": "quill", "blood": "5a2d0d"},
-	"bone_archer": {"names": ["Bone Archer", "Corpse Archer", "Grave Bowman", "Horror Archer"], "hp": 12, "dmg": [2, 5], "spd": 1.8, "xp": 16, "r": 0.3, "range": 7.0, "cd": 1.7, "shot": "arrow", "blood": "6d675a"},
-	"wraith": {"names": ["Wraith", "Gloam", "Black Soul", "Spectre"], "hp": 15, "dmg": [2, 6], "spd": 2.4, "xp": 18, "r": 0.3, "range": 1.0, "cd": 1.2, "elem": "cold", "float": true, "blood": "203040"},
-	"zealot": {"names": ["Zealot", "Flagellant", "Inquisitor", "Ash Templar"], "hp": 20, "dmg": [3, 7], "spd": 2.0, "xp": 20, "r": 0.32, "range": 1.6, "cd": 1.3, "blood": "5a0d0d"},
-	"reaver": {"names": ["Reaver", "Marauder", "Butcher", "Warlord"], "hp": 22, "dmg": [3, 7], "spd": 2.3, "xp": 20, "r": 0.33, "range": 1.1, "cd": 1.2, "blood": "5a0d0d"},
-	"moonsister": {"names": ["Moon Sister", "Dark Ranger", "Vile Huntress", "Night Lancer"], "hp": 14, "dmg": [2, 6], "spd": 2.2, "xp": 20, "r": 0.3, "range": 7.5, "cd": 1.6, "shot": "arrow", "blood": "5a0d0d"},
-	"spitter": {"names": ["Spitter", "Bile Toad", "Plague Belcher", "Mire Horror"], "hp": 24, "dmg": [3, 6], "spd": 1.2, "xp": 22, "r": 0.36, "range": 5.5, "cd": 2.0, "shot": "bile", "elem": "pois", "blood": "3e4a1c"},
-	"thornback": {"names": ["Thornback", "Briar Beast", "Bramble Hulk", "Old Growth"], "hp": 46, "dmg": [5, 11], "spd": 1.3, "xp": 40, "r": 0.42, "range": 1.2, "cd": 1.6, "blood": "2d3a12"},
+	"scrabbler": {"names": ["Typhoid Rats", "Plague Rats", "Crypt Rats", "Rat Colony"], "hp": 9, "dmg": [1, 4], "spd": 2.8, "xp": 8, "r": 0.28, "range": 0.95, "cd": 0.9, "blood": "5a0d0d"},
+	"bonewalker": {"names": ["Drudge Skeletons", "Reassembling Skeleton", "Death Baron", "Lord of the Undead"], "hp": 16, "dmg": [2, 6], "spd": 1.9, "xp": 14, "r": 0.3, "range": 1.0, "cd": 1.2, "blood": "6d675a"},
+	"hexcaller": {"names": ["Vampire Hexmage", "Cabal Archon", "Witch of the Moors", "Liliana's Devotee"], "hp": 12, "dmg": [2, 6], "spd": 1.6, "xp": 20, "r": 0.3, "range": 6.5, "cd": 2.2, "shot": "hex", "elem": "lit", "blood": "3a1650"},
+	"brute": {"names": ["Phyrexian Ghoul", "Phyrexian Rager", "Phyrexian Hulk", "Phyrexian Obliterator"], "hp": 34, "dmg": [4, 9], "spd": 1.5, "xp": 30, "r": 0.4, "range": 1.15, "cd": 1.6, "blood": "4a0a0a"},
+	"warden": {"names": ["Abyssal Gatekeeper", "Abyssal Persecutor", "Lord of the Pit", "Grave Titan"], "hp": 40, "dmg": [5, 10], "spd": 1.9, "xp": 38, "r": 0.45, "range": 1.3, "cd": 1.4, "blood": "10252a"},
+	"rotling": {"names": ["Walking Corpse", "Scathe Zombies", "Diregraf Ghoul", "Carrion Feeder"], "hp": 18, "dmg": [2, 5], "spd": 1.1, "xp": 12, "r": 0.32, "range": 1.0, "cd": 1.5, "blood": "3e4a1c"},
+	"gloomhound": {"names": ["Hollow Dogs", "Nightmare", "Bloodhunter Bat", "Vampire Nighthawk"], "hp": 11, "dmg": [2, 5], "spd": 3.6, "xp": 11, "r": 0.32, "range": 1.0, "cd": 1.0, "blood": "4a0d0d"},
+	"quillback": {"names": ["Carrion Beetles", "Giant Cockroach", "Bog Imp", "Dusk Imp"], "hp": 13, "dmg": [1, 4], "spd": 2.2, "xp": 13, "r": 0.3, "range": 5.5, "cd": 1.8, "shot": "quill", "blood": "5a2d0d"},
+	"bone_archer": {"names": ["Skeleton Archer", "Royal Assassin", "Nezumi Cutthroat", "Okiba-Gang Shinobi"], "hp": 12, "dmg": [2, 5], "spd": 1.8, "xp": 16, "r": 0.3, "range": 7.0, "cd": 1.7, "shot": "arrow", "blood": "6d675a"},
+	"wraith": {"names": ["Bog Wraith", "Dread Shade", "Looming Shade", "Nantuko Shade"], "hp": 15, "dmg": [2, 6], "spd": 2.4, "xp": 18, "r": 0.3, "range": 1.0, "cd": 1.2, "elem": "cold", "float": true, "blood": "203040"},
+	"zealot": {"names": ["Order of the Ebon Hand", "Black Knight", "Knight of Malice", "Knight of the Ebon Legion"], "hp": 20, "dmg": [3, 7], "spd": 2.0, "xp": 20, "r": 0.32, "range": 1.6, "cd": 1.3, "blood": "5a0d0d"},
+	"reaver": {"names": ["Gutless Ghoul", "Skinrender", "Bloodthrone Vampire", "Sengir Vampire"], "hp": 22, "dmg": [3, 7], "spd": 2.3, "xp": 20, "r": 0.33, "range": 1.1, "cd": 1.2, "blood": "5a0d0d"},
+	"moonsister": {"names": ["Hypnotic Specter", "Liliana's Specter", "Abyssal Specter", "Vampire Aristocrat"], "hp": 14, "dmg": [2, 6], "spd": 2.2, "xp": 20, "r": 0.3, "range": 7.5, "cd": 1.6, "shot": "arrow", "blood": "5a0d0d"},
+	"spitter": {"names": ["Festering Newt", "Plague Belcher", "Phyrexian Plaguelord", "Massacre Wurm"], "hp": 24, "dmg": [3, 6], "spd": 1.2, "xp": 22, "r": 0.36, "range": 5.5, "cd": 2.0, "shot": "bile", "elem": "pois", "blood": "3e4a1c"},
+	"thornback": {"names": ["Gurmag Angler", "Krovikan Horror", "Thrashing Wumpus", "Archfiend of Despair"], "hp": 46, "dmg": [5, 11], "spd": 1.3, "xp": 40, "r": 0.42, "range": 1.2, "cd": 1.6, "blood": "2d3a12"},
 }
 ## Unique monster modifiers, like Diablo II's.
 const MODS := {"strong": "Extra Strong", "fast": "Extra Fast", "stone": "Stone Skin", "fire": "Fire Enchanted",

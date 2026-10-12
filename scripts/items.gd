@@ -175,7 +175,7 @@ const UNIQUES := [
 	{"n": "Grip of Embers", "type": "gloves", "base": "Heavy Gloves", "lvl": 8, "tint": Color(0.9, 0.4, 0.2), "mods": {"edef": 60, "fdmg": 5, "ias": 15, "dex": 6}},
 	{"n": "Rope of the Hanged", "type": "belt", "base": "Light Belt", "lvl": 7, "tint": Color(0.55, 0.5, 0.4), "mods": {"edef": 50, "life": 25, "res_pois": 30, "regen": 2}},
 	{"n": "Mirewalkers", "type": "boots", "base": "Heavy Boots", "lvl": 8, "tint": Color(0.35, 0.45, 0.3), "mods": {"edef": 60, "frw": 30, "res_pois": 25, "dex": 5}},
-	{"n": "Eye of Vell", "type": "amulet", "base": "Amulet", "lvl": 10, "tint": Color(0.5, 0.8, 1.0), "mods": {"res_all": 15, "mf": 25, "life": 20, "ene": 8}},
+	{"n": "Eye of the Mire", "type": "amulet", "base": "Amulet", "lvl": 10, "tint": Color(0.5, 0.8, 1.0), "mods": {"res_all": 15, "mf": 25, "life": 20, "ene": 8}},
 	{"n": "Thornloop", "type": "ring", "base": "Ring", "lvl": 6, "tint": Color(0.6, 0.75, 0.4), "mods": {"ias": 15, "leech": 5, "ed": 15, "thorns": 5}},
 	{"n": "Widow's Ember", "type": "ring", "base": "Ring", "lvl": 9, "tint": Color(1.0, 0.45, 0.35), "mods": {"spell": 30, "mana": 25, "mf": 15, "res_fire": 20}},
 ]

@@ -12,15 +12,15 @@ const NPCS := {
 	"vendor": {"name": "Garrick the Smith", "tint": Color(0.85, 0.7, 0.5)},
 }
 const ELDER_LINES := [
-	"The lamps of Vell went dark the night the abbey fell silent. Go north through the gate, across the Ashen Moor. Grisk the Gnawer hunts there.",
-	"The Gallows Fields lie past the moor. Hangman Orrel still keeps his rope. Touch every waypoint you find; they will bring you home.",
-	"Beneath the fields is Hollowroot Cave. Mother Cinder breeds her spitters in the deep roots. Carry draughts against her bile.",
-	"The cave opens into the Sunken Ossuary, where Ossric the Unburied walks. Bones remember. Strike them hard.",
-	"Beyond the ossuary, the Witherwood. Old Thornhide is older than this town. Watch for the archers in the trees.",
-	"The Ruins of Calder were our sister town. The Pale Huntress hunts there now. She will not miss twice.",
-	"The Abbey of Vell. The Hollow Abbot reads his black prayers there. Lightning answers him; seek things that resist it.",
-	"Below the abbey lies the Lampless Deep, and the Lampless King. End him, and the lamps of Vell may burn again.",
-	"The Lampless King is dead. The lamps of Vell are lit again. Rest, wanderer.",
+	"Phyrexian oil seeps up through the mire, and the dead rise compleated. Sheoldred, the Apocalypse is waking beneath the swamp. Begin in the Blackwater Fen; Ayara, First of Locthwain hunts there.",
+	"Past the fen lies Gallows Bog. Kalitas, Traitor of Ghet feeds on the hanged. Touch every waypoint you find; they will bring you home.",
+	"Under the bog is Leechroot Hollow. Sidisi, Brood Tyrant breeds her spawn in the deep roots. Carry draughts against her bile.",
+	"The hollow opens into the Drowned Ossuary, where the Lord of Tresserhorn walks. Bones remember. Strike them hard.",
+	"Beyond the ossuary, Rotwillow Swamp. Grimgrin, Corpse-Born grows fat on the drowned. Watch for the specters overhead.",
+	"The Ruins of Graymire were a town once. Drana, Liberator of Malakir rules them now. She does not miss twice.",
+	"The Cathedral of Whispers. Ob Nixilis, the Fallen keeps its black altar. Lightning answers him; seek things that resist it.",
+	"Below the cathedral lies the Phyrexian Sanctum, and Sheoldred herself. End her, planeswalker, and the mire may yet heal.",
+	"Sheoldred has fallen. The oil stops rising. Rest, planeswalker; other planes will need you.",
 ]
 
 @onready var dungeon: Dungeon = $Dungeon
@@ -198,7 +198,7 @@ func load_area(i: int, arrive: String) -> void:
 func _announce() -> void:
 	var a := Act.area(area)
 	if in_town():
-		show_msg(a.name, "Act I · the last lit town", 3.5)
+		show_msg(a.name, "Act I · the last town above the mire", 3.5)
 	else:
 		var kind := "Wilderness" if a.kind == "open" else "Dungeon"
 		show_msg(a.name, "Act I · %s · area %d of %d" % [kind, area, Act.count() - 1], 3.5)
@@ -236,7 +236,7 @@ func _place_objects() -> void:
 			_add_object(t)
 		elif tp.area == area:
 			t.setup_tportal(tp.wpos, 0)
-			t.label = "Town Portal to Vell's Hollow"
+			t.label = "Town Portal to Mirewatch"
 			_add_object(t)
 	if in_town():
 		for role in NPCS:
@@ -290,7 +290,7 @@ func _populate() -> void:
 				continue
 			var lead := spawn_monster(type, p, r + 2, "unique")
 			lead.uid = uid
-			lead.display_name = Act.unique_name()
+			lead.display_name = Act.unique_name(area, k)
 			for n in randi_range(3, 5):
 				var mm := spawn_monster(type, dungeon.spot_near(p, 2.0), r + 1, "minion")
 				mm.leader = lead
@@ -330,7 +330,7 @@ func spawn_monster(type: String, at: Vector2, rank: int, role := "normal") -> Mo
 
 func start_game() -> void:
 	state = "play"
-	show_msg("Vell's Hollow", "Speak with Elder Maelis, then take the north gate onto the Ashen Moor.", 5.0)
+	show_msg("Mirewatch", "Speak with Elder Maelis, then take the north gate into the Blackwater Fen.", 5.0)
 
 
 # ---------- using things ----------
@@ -407,7 +407,7 @@ func open_town_portal() -> void:
 	tp = {"area": area, "wpos": at}
 	var o := Interactable.new()
 	o.setup_tportal(at, 0)
-	o.label = "Town Portal to Vell's Hollow"
+	o.label = "Town Portal to Mirewatch"
 	_add_object(o)
 	Game.play("nova")
 	burst(at, Color("8ec8ff"), 20, 1.6, 30.0, 0.7, 2.5)
@@ -594,7 +594,7 @@ func kill_monster(m: Monster) -> void:
 			exit_portal.sealed = false
 		Game.play("level")
 		if Act.area(area).boss.get("act_boss", false):
-			show_msg("Act I complete", "%s is dead. The lamps of Vell burn again. Press T to go home." % m.display_name, 7.0)
+			show_msg("Act I complete", "%s is dead. The mire is free of her oil. Press T to go home." % m.display_name, 7.0)
 		else:
 			show_msg("%s falls" % m.display_name, "The way on to %s is open." % Act.area(area + 1).name, 3.5)
 

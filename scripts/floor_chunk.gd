@@ -27,7 +27,7 @@ func _draw() -> void:
 			var s := Game.iso(Vector2(i, j))
 			var v := dg.shade[k]
 			if g == Dungeon.GROUND_WATER:
-				water.append([s, Color(0.08, 0.13, 0.17).lerp(Color(0.12, 0.18, 0.22), v), v])
+				water.append([s, Act.WATER[0].lerp(Act.WATER[1], v), v])
 				continue
 			var variant := 3 if v < 0.08 else (2 if v > 0.84 else (k * 7 + j) % 2)
 			var c := col * (0.85 + v * 0.3)
@@ -49,7 +49,7 @@ func _draw() -> void:
 		Game.quad(self, PackedVector2Array([s, s + Vector2(Game.HW, Game.HH), s + Vector2(0, Game.TH), s + Vector2(-Game.HW, Game.HH)]), w[1])
 	for w in water:
 		if w[2] > 0.7:
-			draw_line(w[0] + Vector2(-10, Game.HH + 2), w[0] + Vector2(8, Game.HH + 2), Color(0.5, 0.6, 0.7, 0.25), 1.0)
+			draw_line(w[0] + Vector2(-10, Game.HH + 2), w[0] + Vector2(8, Game.HH + 2), Color(0.45, 0.55, 0.4, 0.22), 1.0)
 	for d in decor:
 		_decor(d[0], d[1], d[2], d[3], dg)
 

@@ -12,7 +12,7 @@ var v := 0.5
 var tint := Color.WHITE
 var rng := RandomNumberGenerator.new()
 
-const TALL := ["tree", "pine", "deadtree", "stone", "pillar", "tent", "rock", "gallows"]
+const TALL := ["tree", "pine", "deadtree", "stone", "pillar", "tent", "rock", "gallows", "willow"]
 
 
 func setup(t: Vector2i, k: String, shade_value: float, area_tint: Color) -> void:
@@ -83,6 +83,8 @@ func _draw() -> void:
 		"stump": _stump()
 		"bush": _bush()
 		"gallows": _gallows()
+		"willow": _willow()
+		"reeds": _reeds()
 		_: _rock()
 
 
@@ -222,6 +224,43 @@ func _bush() -> void:
 	var g := Color(0.18, 0.26, 0.12) * tint
 	for i in 5:
 		_blob(Vector2(rng.randf_range(-9, 9), rng.randf_range(-12, -4)), rng.randf_range(5, 8), g * (0.8 + i * 0.08))
+
+
+## Swamp tree: a crooked trunk under a dark crown that trails hanging moss.
+func _willow() -> void:
+	var h := 44.0 + rng.randf() * 22.0
+	var lean := rng.randf_range(-7, 7)
+	_shadow(28, 12)
+	var bark := Color(0.2, 0.17, 0.14) * tint
+	var mid := Vector2(lean * 0.4 + rng.randf_range(-3, 3), -h * 0.45)
+	_poly(PackedVector2Array([Vector2(-5, 2), Vector2(5, 2), mid + Vector2(3, 0), mid + Vector2(-3, 0)]), bark)
+	_poly(PackedVector2Array([mid + Vector2(-3, 0), mid + Vector2(3, 0), Vector2(lean + 2, -h * 0.8), Vector2(lean - 2, -h * 0.8)]), bark * 0.9)
+	var crown := Color(0.13, 0.16, 0.1).lerp(Color(0.17, 0.18, 0.1), rng.randf()) * tint
+	var top := Vector2(lean, -h)
+	for i in 6:
+		var a := rng.randf() * TAU
+		_blob(top + Vector2(cos(a) * 13, sin(a) * 5 + 4), rng.randf_range(9, 14), crown * 0.7)
+	for i in 5:
+		var a := rng.randf() * TAU
+		_blob(top + Vector2(cos(a) * 10, sin(a) * 4), rng.randf_range(7, 11), crown)
+	var moss := Color(0.3, 0.33, 0.2) * tint
+	for i in 9:
+		var x := lean + rng.randf_range(-20, 20)
+		var y0 := top.y + rng.randf_range(2, 10)
+		_line(Vector2(x, y0), Vector2(x + rng.randf_range(-2, 2), y0 + rng.randf_range(14, 30)), moss * rng.randf_range(0.7, 1.1), 1.4)
+
+
+## Reeds and cattails at the water's edge.
+func _reeds() -> void:
+	_shadow(12, 5)
+	var g := Color(0.28, 0.3, 0.16) * tint
+	for i in 9:
+		var x := rng.randf_range(-10, 10)
+		var hh := rng.randf_range(10, 22)
+		var bend := rng.randf_range(-3, 3)
+		_line(Vector2(x, rng.randf_range(-2, 3)), Vector2(x + bend, -hh), g * rng.randf_range(0.7, 1.2), 1.2)
+		if i % 3 == 0:
+			_rect(Rect2(x + bend - 1.3, -hh - 1, 2.6, 6), Color(0.24, 0.15, 0.09) * tint)
 
 
 func _gallows() -> void:

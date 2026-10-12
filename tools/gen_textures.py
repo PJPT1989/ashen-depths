@@ -2,7 +2,8 @@
 
 Run from the project root:  python3 tools/gen_textures.py
 Writes textures/<name>_albedo.png and <name>_normal.png for:
-  floor (crypt stone), grass, heath, dirt, cobble, cave, flags (abbey floor): 4 variants side by side
+  floor (crypt stone), grass, heath, dirt, cobble, cave, flags (abbey floor), bog and mud (the
+  swamps of Act I): 4 variants side by side
   wall (brick), rock (cave wall), wood (palisade): a face and a cap side by side
 Stone stays fairly neutral and is tinted per area in code; outdoor ground has its own colour.
 """
@@ -184,6 +185,62 @@ def dirt_tile(k):
     return np.clip(rgb, 0, 1), h
 
 
+def bog_tile(k):
+    """Act I swamp ground: dark peat with moss clumps, reeds and wet sheen."""
+    yy, xx = np.mgrid[0:S, 0:S].astype(float)
+    n = fbm(S, 5, 4)
+    fine = fbm(S, 3, 32)
+    h = n * 0.45 + fine * 0.2
+    alb = 0.22 + n * 0.16 + fine * 0.08
+    rgb = np.dstack([alb * 0.75, alb * 0.72, alb * 0.55])
+    moss = smoothstep(0.5, 0.62, fbm(S, 4, 6))
+    mc = np.dstack([0.15 + fine * 0.06, 0.17 + fine * 0.07, 0.09 + fine * 0.04])
+    rgb = rgb * (1 - moss[..., None]) + mc * moss[..., None]
+    h += moss * 0.25
+    for _ in range(160 + k * 40):  # reed and grass stalks
+        x, y = rng.uniform(0, S, 2)
+        l = rng.uniform(3, 8)
+        a = rng.uniform(-0.4, 0.4) - np.pi / 2
+        for t in np.linspace(0, l, 8):
+            xi, yi = int(x + np.cos(a) * t) % S, int(y + np.sin(a) * t) % S
+            rgb[yi, xi] = rgb[yi, xi] * 0.4 + np.array([0.3, 0.32, 0.16]) * 0.6
+            h[yi, xi] += 0.1
+    if k >= 2:  # shallow puddles of black water with soft edges
+        for _ in range(k - 1):
+            px, py, r = rng.uniform(25, S - 25), rng.uniform(25, S - 25), rng.uniform(7, 14)
+            w = 1 - smoothstep(r * 0.6, r, np.hypot((xx - px) * 0.8, yy - py))
+            h = h * (1 - w * 0.8)
+            rgb = rgb * (1 - w[..., None] * 0.75) + np.array([0.04, 0.05, 0.04]) * w[..., None] * 0.75
+    if k == 3:  # a scattered bone or two
+        for _ in range(3):
+            px, py, r = rng.uniform(10, S - 10), rng.uniform(10, S - 10), rng.uniform(1.5, 3)
+            m = np.hypot(xx - px, yy - py) < r
+            h[m] += 0.4
+            rgb[m] = np.array([0.42, 0.39, 0.32])
+    return np.clip(rgb * 1.5, 0, 1), h
+
+
+def mud_tile(k):
+    """Act I paths: churned dark mud with standing water in the ruts."""
+    yy, xx = np.mgrid[0:S, 0:S].astype(float)
+    n = fbm(S, 5, 4)
+    fine = fbm(S, 3, 32)
+    h = n * 0.5 + fine * 0.3
+    alb = 0.22 + n * 0.14 + fine * 0.07
+    rgb = np.dstack([alb * 0.9, alb * 0.78, alb * 0.62])
+    for _ in range(40 + k * 10):
+        px, py, r = rng.uniform(0, S), rng.uniform(0, S), rng.uniform(1, 3)
+        m = np.hypot(xx - px, yy - py) < r
+        h[m] += 0.25
+        rgb[m] *= rng.uniform(0.75, 1.2)
+    off = rng.uniform(30, 90)
+    for d in (0, 22):
+        m = np.abs(yy - (off + d) - np.sin(xx / 20) * 3) < 3.5
+        h[m] = h[m] * 0.3 - 0.1
+        rgb[m] = rgb[m] * 0.35 + np.array([0.08, 0.09, 0.07]) * 0.65
+    return np.clip(rgb * 1.45, 0, 1), h
+
+
 def cobble_tile(k):
     yy, xx = np.mgrid[0:S, 0:S].astype(float)
     n_pts = 22 + k * 3
@@ -288,4 +345,6 @@ save([cave_tile(k) for k in range(4)], "cave")
 save([flag_tile(k) for k in range(4)], "flags")
 save([rock_face(), rock_cap()], "rock")
 save([log_face(), log_cap()], "wood")
+save([bog_tile(k) for k in range(4)], "bog")
+save([mud_tile(k) for k in range(4)], "mud")
 print("textures written")

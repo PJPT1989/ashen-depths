@@ -199,7 +199,7 @@ static func _town(d: Dungeon) -> void:
 	for k in 10:
 		var p := Vector2i(randi_range(lo + 1, hi - 1), randi_range(lo + 1, hi - 1))
 		if Vector2(p).distance_to(Vector2(center)) > 6.0 and d.ground[d.idx(p.x, p.y)] != Dungeon.GROUND_PATH:
-			d.block(p.x, p.y, ["hay", "stump", "bush"].pick_random())
+			d.block(p.x, p.y, ["hay", "stump", "reeds"].pick_random())
 	d.spots.vendor = _c(center + Vector2i(7, -5))
 	d.spots.healer = _c(center + Vector2i(-7, 5))
 	d.spots.elder = _c(center + Vector2i(-6, -5))
@@ -208,7 +208,7 @@ static func _town(d: Dungeon) -> void:
 	d.exit = _c(Vector2i(gx, 2))
 	d.entrance = Vector2(-100, -100)
 	d.boss_spot = Vector2(-100, -100)
-	_dress_border(d, ["tree", "pine", "rock"], [5, 3, 1], 4)
+	_dress_border(d, ["willow", "deadtree", "rock"], [5, 3, 1], 4)
 
 
 # ---------- wide outdoor areas ----------
@@ -272,15 +272,18 @@ static func _open(d: Dungeon, biome: String) -> void:
 				for x in W:
 					if not d.is_floor(x, y) or keep.call(x, y):
 						continue
-					if n3.get_noise_2d(x, y) > 0.42:
+					var wet := n3.get_noise_2d(x, y)
+					if wet > 0.3:
 						d.map[d.idx(x, y)] = 0
 						d.ground[d.idx(x, y)] = Dungeon.GROUND_WATER
-					elif n2.get_noise_2d(x, y) > 0.38 and randf() < 0.7:
+					elif wet > 0.22 and randf() < 0.25:
+						d.block(x, y, "reeds")
+					elif n2.get_noise_2d(x, y) > 0.42 and randf() < 0.6:
 						d.block(x, y, "rock")
 					elif randf() < 0.012:
 						d.block(x, y, "deadtree")
-					elif randf() < 0.01:
-						d.block(x, y, "bush")
+					elif randf() < 0.008:
+						d.block(x, y, "willow")
 			for k in 2:
 				_stone_circle(d, keep)
 		"fields":
@@ -292,11 +295,14 @@ static func _open(d: Dungeon, biome: String) -> void:
 				for x in W:
 					if not d.is_floor(x, y) or keep.call(x, y):
 						continue
-					if randf() < 0.008:
-						d.block(x, y, "hay")
+					if n3.get_noise_2d(x, y) > 0.5:
+						d.map[d.idx(x, y)] = 0
+						d.ground[d.idx(x, y)] = Dungeon.GROUND_WATER
+					elif randf() < 0.006:
+						d.block(x, y, "reeds")
 					elif randf() < 0.008:
-						d.block(x, y, "tree")
-					elif randf() < 0.003:
+						d.block(x, y, "willow" if randf() < 0.6 else "deadtree")
+					elif randf() < 0.004:
 						d.block(x, y, "gallows")
 		"forest":
 			for y in H:
@@ -304,10 +310,13 @@ static func _open(d: Dungeon, biome: String) -> void:
 					if not d.is_floor(x, y) or keep.call(x, y):
 						continue
 					var v := n2.get_noise_2d(x, y)
-					if v > -0.05 and randf() < 0.8:
-						d.block(x, y, "pine" if randf() < 0.35 else "tree")
+					if n3.get_noise_2d(x, y) > 0.38:
+						d.map[d.idx(x, y)] = 0
+						d.ground[d.idx(x, y)] = Dungeon.GROUND_WATER
+					elif v > -0.05 and randf() < 0.75:
+						d.block(x, y, ["willow", "willow", "deadtree", "pine"].pick_random())
 					elif randf() < 0.025:
-						d.block(x, y, ["bush", "stump", "deadtree"].pick_random())
+						d.block(x, y, ["reeds", "stump", "deadtree"].pick_random())
 		"ruins":
 			for k in 11:
 				_house(d, keep, 0.4)
@@ -317,8 +326,11 @@ static func _open(d: Dungeon, biome: String) -> void:
 						continue
 					if n2.get_noise_2d(x, y) > 0.45:
 						d.ground[d.idx(x, y)] = Dungeon.GROUND_PATH
-					if randf() < 0.01:
-						d.block(x, y, ["pillar", "rock", "tree", "grave"].pick_random())
+					if n3.get_noise_2d(x, y) > 0.48:
+						d.map[d.idx(x, y)] = 0
+						d.ground[d.idx(x, y)] = Dungeon.GROUND_WATER
+					elif randf() < 0.01:
+						d.block(x, y, ["pillar", "rock", "deadtree", "grave"].pick_random())
 			_graveyard(d, keep)
 	# whatever the road can't reach becomes part of the scenery
 	var dist := _flood(d, Vector2i(d.start))
@@ -327,10 +339,10 @@ static func _open(d: Dungeon, biome: String) -> void:
 			if d.map[d.idx(x, y)] == 1 and dist[d.idx(x, y)] < 0:
 				d.map[d.idx(x, y)] = 0
 	match biome:
-		"moor": _dress_border(d, ["rock", "deadtree", "bush"], [5, 3, 2])
-		"fields": _dress_border(d, ["tree", "bush", "rock"], [5, 3, 1])
-		"forest": _dress_border(d, ["tree", "pine"], [3, 2], 4)
-		_: _dress_border(d, ["tree", "rock", "pine"], [3, 3, 1])
+		"moor": _dress_border(d, ["rock", "deadtree", "willow"], [5, 3, 2])
+		"fields": _dress_border(d, ["willow", "deadtree", "rock"], [5, 3, 1])
+		"forest": _dress_border(d, ["willow", "deadtree"], [3, 2], 4)
+		_: _dress_border(d, ["willow", "rock", "deadtree"], [3, 3, 1])
 
 
 static func _stone_circle(d: Dungeon, keep: Callable) -> void:
