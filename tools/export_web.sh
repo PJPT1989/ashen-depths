@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Exports the browser build into build/web/ (no threads, so no special server headers needed).
+# With --threads it exports the multi-threaded build into build/web-mt/ instead: faster, but the
+# server must send Cross-Origin-Opener-Policy: same-origin and Cross-Origin-Embedder-Policy: require-corp.
 # Downloads Godot's 4.3 export templates the first time (about 1 GB, only the web ones are kept).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -14,10 +16,12 @@ if [ ! -f "$TPL/web_nothreads_release.zip" ]; then
 	mv "$tmp"/templates/* "$TPL/"
 	rm -rf "$tmp"
 fi
-mkdir -p "$ROOT/build/web"
+PRESET="Web"; OUT="$ROOT/build/web"
+if [ "${1:-}" = "--threads" ]; then PRESET="Web Threads"; OUT="$ROOT/build/web-mt"; fi
+mkdir -p "$OUT"
 # Keep Godot from importing the previous build's images (they would end up inside the next .pck).
 touch "$ROOT/build/.gdignore"
-rm -f "$ROOT"/build/web/*.import
-"$GODOT" --headless --path "$ROOT" --export-release "Web" "$ROOT/build/web/index.html"
-cp "$ROOT/tools/web/.htaccess" "$ROOT/tools/web/HOW-TO-UPLOAD.txt" "$ROOT/build/web/"
-echo "web build in $ROOT/build/web ($(du -sh "$ROOT/build/web" | cut -f1))"
+rm -f "$ROOT"/build/web*/*.import
+"$GODOT" --headless --path "$ROOT" --export-release "$PRESET" "$OUT/index.html"
+cp "$ROOT/tools/web/.htaccess" "$ROOT/tools/web/HOW-TO-UPLOAD.txt" "$OUT/"
+echo "web build in $OUT ($(du -sh "$OUT" | cut -f1))"

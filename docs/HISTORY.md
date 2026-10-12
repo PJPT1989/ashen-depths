@@ -143,3 +143,16 @@ The switch became three levels, cycled with L or the title screen button (Low, M
 in-place bloom, the browser's default, shader renamed `post_medium.gdshader`) and **Low** (round 9).
 The browser still drops to Low by itself once if the first seconds are slow and nobody chose. The
 smoke test and benchmark (`--quality=0|1|2`) never save the setting.
+
+## 11. Multi-threaded web build (2026-10-12)
+> Web version still feels way clunkier then what i see in godot desktop app, is that normal?
+> [offered the multi-threaded web build] yes, try it pls
+
+Added the export preset "Web Threads" (`tools/export_web.sh --threads`, output `build/web-mt/`).
+It moves audio mixing and loading off the main thread; game logic and drawing stay on it, so the
+gain is smoother frames rather than a big fps jump. It needs SharedArrayBuffer, so the page must be
+cross-origin isolated (COOP `same-origin`, COEP `require-corp`): `tools/web/.htaccess` now sends
+both, and the shop sets them for the game page in its `_headers`. The shop keeps the no-threads
+build as a fallback for browsers that aren't isolated. The container's software-rendered Chromium
+runs both builds at about 2 fps (the graphics emulation is the bottleneck), so the real difference
+could only be judged on Petr's laptop.

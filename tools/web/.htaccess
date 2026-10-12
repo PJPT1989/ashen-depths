@@ -4,3 +4,8 @@ AddType application/octet-stream .pck
 <IfModule mod_deflate.c>
   AddOutputFilterByType DEFLATE application/wasm application/javascript text/html
 </IfModule>
+# Needed by the multi-threaded build (export_web.sh --threads); harmless for the other one.
+<IfModule mod_headers.c>
+  Header set Cross-Origin-Opener-Policy "same-origin"
+  Header set Cross-Origin-Embedder-Policy "require-corp"
+</IfModule>

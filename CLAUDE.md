@@ -30,7 +30,9 @@ made so far and what was built for it; read it before planning bigger work.
 - Run the smoke test after every change and look at the screenshots it saves (Read the PNGs). When a
   feature isn't covered, extend `autotest.gd` with a step and an `AUTOTEST ...` print line.
 - `tools/export_web.sh` builds the browser version into `build/web/` (git-ignored, about 65 MB). It
-  uses the no-threads web template, so any HTTPS host works without special headers. Petr hosts it on
+  uses the no-threads web template, so any HTTPS host works without special headers.
+  `tools/export_web.sh --threads` builds the multi-threaded one into `build/web-mt/` (preset "Web Threads");
+  it needs the page served with COOP `same-origin` and COEP `require-corp` (the shop does this). Petr hosts it on
   his own website; give him the folder as a zip.
 - Frame rate: `xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1920x1080 -- --bench --area=1`
   (add `--web` for the browser build's settings, `--off=post,lights,...` to see what something costs).

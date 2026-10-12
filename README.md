@@ -116,7 +116,7 @@ python3 tools/gen_textures.py
 - `tools/smoke_test.sh` runs `godot --path . -- --autotest --shots=DIR` (under `xvfb-run` when there is
   no display). It visits the town, the inventory and trader, fights on the moor, then visits every area,
   kills the act boss, dies and wakes in town, printing a summary and saving screenshots.
-- `tools/export_web.sh` exports the browser version to `build/web/`; upload that folder to any HTTPS site
+- `tools/export_web.sh` exports the browser version to `build/web/` (`--threads`: the faster multi-threaded one to `build/web-mt/`, which needs the cross-origin isolation headers in `tools/web/.htaccess`); upload that folder to any HTTPS site
   (see `tools/web/HOW-TO-UPLOAD.txt`).
 
 Developer notes for Claude Code sessions are in `CLAUDE.md`; the request-by-request history is in
