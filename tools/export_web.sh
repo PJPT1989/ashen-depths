@@ -15,6 +15,9 @@ if [ ! -f "$TPL/web_nothreads_release.zip" ]; then
 	rm -rf "$tmp"
 fi
 mkdir -p "$ROOT/build/web"
+# Keep Godot from importing the previous build's images (they would end up inside the next .pck).
+touch "$ROOT/build/.gdignore"
+rm -f "$ROOT"/build/web/*.import
 "$GODOT" --headless --path "$ROOT" --export-release "Web" "$ROOT/build/web/index.html"
 cp "$ROOT/tools/web/.htaccess" "$ROOT/tools/web/HOW-TO-UPLOAD.txt" "$ROOT/build/web/"
 echo "web build in $ROOT/build/web ($(du -sh "$ROOT/build/web" | cut -f1))"
