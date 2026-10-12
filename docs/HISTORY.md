@@ -171,3 +171,34 @@ are two triangles), and a primitive batch keeps its first texture even into the 
 600 down to 400. A screenshot on the same map layout (`--seed`) matches the old ground pixel for
 pixel. Software rendering here barely notices draw calls, so the gain is for real browsers and GPUs.
 Also fixed: rock highlights and other 4-point prop shapes were drawn as half a shape since round 9.
+
+## 13. Magic: The Gathering theme (2026-10-12)
+> Ok I want to do major theme change ... The theme will be Magic the gathering. Heroes will be
+> individual planeswalkers ... Ajani ... melee tanky, Chandra ... squishy with strong spells, Liliana is
+> counterpart to necromancer. Once you design visuals for these individual heroes, create skill tree for
+> them (similiar to oriiginal diablo 3). Rename monsters ... names of creatures from MTG. Bosses and
+> subbosses will have name of legendary cratures ... 5 acts, each act corresponding to MTG colour, Act
+> one is going to be black ... swamp ... Adjust visual of common monsters ... Act 1 will have final boss
+> called Sheoldred.
+
+Built in four stages on a branch, never put live without Petr's word: Wizards' Fan Content Policy says
+games using their IP need written permission, so whether to publish is his call.
+1. **Black act.** Town Mirewatch and eight swamp areas with new names; every boss and unique is an MTG
+   legend (Ayara, Kalitas, Sidisi, Lord of Tresserhorn, Grimgrin, Drana, Ob Nixilis, Sheoldred, the
+   Apocalypse as act boss). Monster tiers renamed after black creatures. New bog and mud ground, black
+   water, willows and reeds; elder, title and messages rewritten.
+2. **Heroes.** Ajani (white leonin, gold mane, scar, harness, tail), Chandra (flame hair, goggles, red
+   coat) and Liliana (violet gown, the Chain Veil) as body layers on the shared skeleton, so all gear
+   still shows. Picked on the title screen; starting stats, life and mana copy the Diablo II Barbarian,
+   Sorceress and Necromancer.
+3. **Skills like Diablo III.** 12 skills per hero in 6 categories, unlocked by level, 3 runes each,
+   6 passives with slots at levels 4, 10 and 16; six hotbar slots (left, right, 1-4) and a skills panel
+   (S). Resources: Ferocity (built by hitting), Mana (fast refill), Soul (from rites). New systems:
+   minions that follow between areas and draw aggro, corpses, curses (weaken, vulnerable, fear, rot),
+   burns, stuns, knockback, leaps, charges, teleport, meteors, beams and clouds. Potions moved to Q/W.
+   Fireball and Frost Nova as fixed spells are gone.
+4. **Monsters.** Ten models remade after MTG creatures: rats, vampire hexmages, Phyrexians (porcelain
+   over sinew, chrome, oil), winged demons, carrion beetles, black knights, vampire warriors, flying
+   specters (now throw hexes), plague spitters and the Gurmag Angler with its lure.
+The smoke test now shows the hero choice and casts every skill of every hero with every rune.
+

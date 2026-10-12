@@ -20,7 +20,7 @@ const TYPES := {
 	"wraith": {"names": ["Bog Wraith", "Dread Shade", "Looming Shade", "Nantuko Shade"], "hp": 15, "dmg": [2, 6], "spd": 2.4, "xp": 18, "r": 0.3, "range": 1.0, "cd": 1.2, "elem": "cold", "float": true, "blood": "203040"},
 	"zealot": {"names": ["Order of the Ebon Hand", "Black Knight", "Knight of Malice", "Knight of the Ebon Legion"], "hp": 20, "dmg": [3, 7], "spd": 2.0, "xp": 20, "r": 0.32, "range": 1.6, "cd": 1.3, "blood": "5a0d0d"},
 	"reaver": {"names": ["Gutless Ghoul", "Skinrender", "Bloodthrone Vampire", "Sengir Vampire"], "hp": 22, "dmg": [3, 7], "spd": 2.3, "xp": 20, "r": 0.33, "range": 1.1, "cd": 1.2, "blood": "5a0d0d"},
-	"moonsister": {"names": ["Hypnotic Specter", "Liliana's Specter", "Abyssal Specter", "Vampire Aristocrat"], "hp": 14, "dmg": [2, 6], "spd": 2.2, "xp": 20, "r": 0.3, "range": 7.5, "cd": 1.6, "shot": "arrow", "blood": "5a0d0d"},
+	"moonsister": {"names": ["Hypnotic Specter", "Liliana's Specter", "Abyssal Specter", "Vampire Aristocrat"], "hp": 14, "dmg": [2, 6], "spd": 2.2, "xp": 20, "r": 0.3, "range": 7.5, "cd": 1.6, "shot": "hex", "float": true, "blood": "1a1020"},
 	"spitter": {"names": ["Festering Newt", "Plague Belcher", "Phyrexian Plaguelord", "Massacre Wurm"], "hp": 24, "dmg": [3, 6], "spd": 1.2, "xp": 22, "r": 0.36, "range": 5.5, "cd": 2.0, "shot": "bile", "elem": "pois", "blood": "3e4a1c"},
 	"thornback": {"names": ["Gurmag Angler", "Krovikan Horror", "Thrashing Wumpus", "Archfiend of Despair"], "hp": 46, "dmg": [5, 11], "spd": 1.3, "xp": 40, "r": 0.42, "range": 1.2, "cd": 1.6, "blood": "2d3a12"},
 }

@@ -14,9 +14,9 @@ const TYPES := ["hero", "townsfolk", "scrabbler", "bonewalker", "hexcaller", "br
 const HERO_LAYERS := ["base_ajani", "base_chandra", "base_liliana", "boots", "armor_light", "armor_medium", "armor_heavy", "belt", "gloves",
 	"helm_hood", "helm_cap", "helm_great", "shield_buckler", "shield_kite", "weapon_sword", "weapon_axe", "weapon_mace"]
 ## Attack animation per model.
-const STYLE := {"hero": "swing", "townsfolk": "swing", "scrabbler": "claw", "bonewalker": "swing", "hexcaller": "staff",
+const STYLE := {"hero": "swing", "townsfolk": "swing", "scrabbler": "bite", "bonewalker": "swing", "hexcaller": "staff",
 	"brute": "swing", "warden": "swing", "rotling": "claw", "gloomhound": "bite", "quillback": "rear",
-	"bone_archer": "bow", "wraith": "claw", "zealot": "thrust", "reaver": "swing", "moonsister": "bow",
+	"bone_archer": "bow", "wraith": "claw", "zealot": "thrust", "reaver": "swing", "moonsister": "claw",
 	"spitter": "spit", "thornback": "slam"}
 
 ## Every MeshInstance3D that glows gets an entry: mesh -> emission color (for the glow pass).
@@ -531,32 +531,28 @@ func _townsfolk() -> Dictionary:
 	return r
 
 
+## Plague rat: hunched, bald pink tail, buck teeth, red eyes.
 func _scrabbler() -> Dictionary:
-	var hide := mat(Color(0.55, 0.16, 0.1), 0.75)
-	var dark := mat(Color(0.25, 0.07, 0.05), 0.8)
-	var horn := mat(Color(0.85, 0.78, 0.6), 0.5)
-	var r := humanoid({"arm_mat": hide, "leg_mat": hide, "limb": 0.05, "leg": 0.065, "hip_h": 0.7, "chest_h": 0.45, "shoulders": 0.17, "arm_len": 0.27, "foot_mat": dark})
+	var fur := mat(Color(0.33, 0.28, 0.25), 0.95)
+	var belly := mat(Color(0.5, 0.44, 0.4), 0.95)
+	var pink := mat(Color(0.78, 0.55, 0.52), 0.7)
+	var tooth := mat(Color(0.95, 0.85, 0.55), 0.4)
+	var r := quad({"leg_mat": pink, "hip_h": 0.24, "len": 0.55, "leg": 0.035, "width": 0.1})
 	var t: Node3D = r.torso
-	t.rotation.x = 0.55
-	part(t, sphere(0.2, 1.25), Vector3(0, 0.25, 0), hide)
-	part(t, sphere(0.15), Vector3(0, 0.38, 0.06), dark)
-	for i in 3:
-		part(t, cyl(0.0, 0.035, 0.12), Vector3(0, 0.3 + i * 0.09, 0.17 - i * 0.02), horn, Vector3(-0.9, 0, 0))
-	var tail := joint(r.hips, Vector3(0, -0.02, 0.14))
-	r.tail = tail
-	part(tail, cyl(0.015, 0.045, 0.5), Vector3(0, -0.12, 0.2), hide, Vector3(1.1, 0, 0))
+	part(t, sphere(0.2, 0.8), Vector3(0, 0.04, 0.06), fur, Vector3.ZERO, Vector3(1, 1, 1.5))
+	part(t, sphere(0.14, 0.7), Vector3(0, -0.04, 0.0), belly, Vector3.ZERO, Vector3(1, 1, 1.6))
+	for i in 4:
+		part(t, cyl(0.0, 0.025, 0.1), Vector3(0, 0.17, -0.12 + i * 0.1), fur, Vector3(0.9, 0, 0))   # bristles
 	var n: Node3D = r.neck
-	n.rotation.x = -0.45
-	part(n, sphere(0.16, 0.95), Vector3(0, 0.1, -0.05), hide)
-	part(n, sphere(0.1, 0.7), Vector3(0, 0.04, -0.17), dark)
+	part(n, sphere(0.11), Vector3(0, 0.02, -0.06), fur)
+	part(n, cyl(0.025, 0.08, 0.16), Vector3(0, -0.01, -0.17), fur, Vector3(PI / 2, 0, 0))   # snout
+	part(n, sphere(0.022), Vector3(0, -0.01, -0.26), pink)
+	part(n, box(0.035, 0.04, 0.012), Vector3(0, -0.06, -0.23), tooth)
 	for s in [-1, 1]:
-		part(n, cyl(0.0, 0.04, 0.22), Vector3(0.09 * s, 0.25, -0.02), horn, Vector3(-0.3, 0, -0.45 * s))
-		part(n, cyl(0.0, 0.05, 0.16), Vector3(0.16 * s, 0.12, 0.0), hide, Vector3(0, 0, -1.3 * s))
-		eye(n, Vector3(0.065 * s, 0.13, -0.17), 0.032, Color(1, 0.8, 0.15))
-	for side in ["l", "r"]:
-		for k in 3:
-			part(r["hand_" + side], cyl(0.0, 0.018, 0.12), Vector3((k - 1) * 0.03, -0.06, -0.03), horn, Vector3(0.4, 0, 0))
-	r.scale = 0.72
+		part(n, cyl(0.055, 0.055, 0.015, 10), Vector3(0.07 * s, 0.11, -0.02), pink, Vector3(0.3, 0, PI / 2 - 0.3 * s))
+		eye(n, Vector3(0.05 * s, 0.05, -0.14), 0.02, Color(1, 0.15, 0.1))
+	part(r.tail, cyl(0.006, 0.022, 0.6), Vector3(0, -0.06, 0.32), pink, Vector3(1.35, 0, 0))
+	r.scale = 1.15
 	return r
 
 
@@ -609,90 +605,120 @@ func _bone_archer() -> Dictionary:
 	return r
 
 
+## Vampire hexmage: pale and gaunt, slicked hair, a black robe with a tall crimson-lined collar.
 func _hexcaller() -> Dictionary:
-	var robe := mat(Color(0.28, 0.1, 0.38), 0.95)
-	var trim := mat(Color(0.55, 0.42, 0.18), 0.5, 0.6)
-	var wood := mat(Color(0.3, 0.2, 0.12), 0.8)
-	var r := humanoid({"arm_mat": robe, "leg_mat": robe, "hide_legs": true, "hand_mat": mat(Color(0.5, 0.55, 0.45))})
+	var robe := mat(Color(0.08, 0.06, 0.08), 0.85)
+	var crimson := mat(Color(0.55, 0.05, 0.08), 0.7)
+	var skin := mat(Color(0.82, 0.8, 0.82), 0.6)
+	var gold := mat(Color(0.75, 0.6, 0.3), 0.4, 0.7)
+	var r := humanoid({"arm_mat": robe, "leg_mat": robe, "hide_legs": true, "hand_mat": skin})
 	var hips: Node3D = r.hips
-	part(hips, cyl(0.15, 0.4, 0.98), Vector3(0, -0.47, 0), robe)
-	part(hips, torus(0.36, 0.41), Vector3(0, -0.93, 0), trim, Vector3.ZERO, Vector3(1, 0.4, 1))
+	part(hips, cyl(0.15, 0.38, 0.98), Vector3(0, -0.47, 0), robe)
+	part(hips, torus(0.34, 0.39), Vector3(0, -0.93, 0), crimson, Vector3.ZERO, Vector3(1, 0.4, 1))
 	var t: Node3D = r.torso
-	t.rotation.x = 0.15
-	part(t, capsule(0.17, 0.6), Vector3(0, 0.3, 0), robe)
-	part(t, box(0.08, 0.6, 0.02), Vector3(0, 0.25, -0.17), trim)
+	t.rotation.x = 0.12
+	part(t, capsule(0.16, 0.6), Vector3(0, 0.3, 0), robe)
+	part(t, box(0.07, 0.62, 0.02), Vector3(0, 0.25, -0.165), crimson)
+	part(t, sphere(0.04), Vector3(0, 0.48, -0.17), gold)
 	for s in [-1, 1]:
-		part(r["el_" + ("l" if s < 0 else "r")], cyl(0.09, 0.06, 0.22), Vector3(0, -0.2, 0), robe)
+		part(t, box(0.03, 0.42, 0.22), Vector3(0.16 * s, 0.68, 0.04), crimson, Vector3(0.25, 0, -0.35 * s))   # the collar
+		part(t, box(0.025, 0.44, 0.24), Vector3(0.175 * s, 0.68, 0.05), robe, Vector3(0.25, 0, -0.35 * s))
+		part(r["el_" + ("l" if s < 0 else "r")], cyl(0.1, 0.06, 0.24), Vector3(0, -0.2, 0), robe)
 	var n: Node3D = r.neck
-	part(n, sphere(0.1), Vector3(0, 0.12, 0), mat(Color(0.05, 0.03, 0.06)))
-	part(n, cyl(0.0, 0.17, 0.42), Vector3(0, 0.2, 0.03), robe, Vector3(0.2, 0, 0))
+	part(n, sphere(0.1, 1.1), Vector3(0, 0.13, -0.01), skin)
+	part(n, sphere(0.104, 0.8), Vector3(0, 0.18, 0.025), mat(Color(0.04, 0.03, 0.04), 0.4))   # slicked hair
+	part(n, cyl(0.0, 0.04, 0.08), Vector3(0, 0.22, -0.08), mat(Color(0.04, 0.03, 0.04), 0.4), Vector3(-1.2, 0, 0))   # widow's peak
 	for s in [-1, 1]:
-		eye(n, Vector3(0.04 * s, 0.12, -0.09), 0.022, Color(0.5, 1, 0.6))
+		eye(n, Vector3(0.037 * s, 0.14, -0.09), 0.018, Color(1, 0.12, 0.15))
+		part(n, cyl(0.0, 0.03, 0.08), Vector3(0.1 * s, 0.16, 0.0), skin, Vector3(0, 0, -1.3 * s))   # pointed ears
 	var staff := upright(r.hand_l)
-	part(staff, cyl(0.025, 0.03, 1.7), Vector3(0, 0.35, 0), wood)
-	part(staff, torus(0.05, 0.08), Vector3(0, 1.2, 0), trim, Vector3(PI / 2, 0, 0))
-	part(staff, sphere(0.075), Vector3(0, 1.22, 0), glow_mat(Color(0.55, 1, 0.65)), Vector3.ZERO, Vector3.ONE, Color(0.35, 1, 0.5, 1))
+	part(staff, cyl(0.022, 0.026, 1.7), Vector3(0, 0.35, 0), mat(Color(0.12, 0.08, 0.08), 0.6))
+	part(staff, cyl(0.0, 0.05, 0.2), Vector3(0, 1.3, 0), gold)
+	part(staff, sphere(0.07), Vector3(0, 1.2, 0), glow_mat(Color(0.75, 0.35, 1.0)), Vector3.ZERO, Vector3.ONE, Color(0.6, 0.3, 1.0, 1))
 	r.staff = staff
 	r.scale = 1.0
 	return r
 
 
+## Phyrexian: porcelain plates bolted over red sinew, chrome spines, a blade for a hand,
+## black oil weeping from the seams.
 func _brute() -> Dictionary:
-	var skin := mat(Color(0.42, 0.47, 0.25), 0.75)
-	var dark := mat(Color(0.28, 0.3, 0.16), 0.8)
-	var fur := mat(Color(0.3, 0.2, 0.12), 1.0)
-	var tusk := mat(Color(0.92, 0.88, 0.75), 0.45)
-	var r := humanoid({"arm_mat": skin, "leg_mat": dark, "limb": 0.1, "leg": 0.11, "hip_h": 0.85, "chest_h": 0.7, "shoulders": 0.36, "arm_len": 0.36, "foot_mat": fur})
+	var sinew := mat(Color(0.42, 0.08, 0.08), 0.55)
+	var plate := mat(Color(0.7, 0.68, 0.64), 0.35, 0.1)
+	var chrome := mat(Color(0.75, 0.77, 0.8), 0.2, 0.9)
+	var oil := mat(Color(0.03, 0.03, 0.04), 0.1, 0.3)
+	var r := humanoid({"arm_mat": sinew, "leg_mat": sinew, "limb": 0.085, "leg": 0.095, "hip_h": 0.85, "chest_h": 0.7, "shoulders": 0.33, "arm_len": 0.36, "foot_mat": chrome})
 	var t: Node3D = r.torso
 	t.rotation.x = 0.3
-	part(t, sphere(0.36, 1.15), Vector3(0, 0.38, 0), skin)
-	part(t, sphere(0.3), Vector3(0, 0.12, -0.05), dark)
-	part(t, cyl(0.3, 0.36, 0.25), Vector3(0, -0.05, 0), fur)
+	part(t, sphere(0.32, 1.2), Vector3(0, 0.36, 0), sinew)
+	part(t, box(0.42, 0.34, 0.16), Vector3(0, 0.46, -0.2), plate, Vector3(-0.1, 0, 0))          # breastplate
+	for i in 3:
+		part(t, box(0.3 - i * 0.04, 0.05, 0.12), Vector3(0, 0.22 - i * 0.08, -0.22), plate)     # ribbed belly
+	part(t, cyl(0.26, 0.3, 0.22), Vector3(0, -0.03, 0), oil)
+	for i in 5:
+		part(t, cyl(0.0, 0.035, 0.32), Vector3(0, 0.25 + i * 0.1, 0.24), chrome, Vector3(0.9, 0, 0))   # spines
 	for s in [-1, 1]:
-		part(t, sphere(0.16), Vector3(0.33 * s, 0.6, 0.02), skin)
-		part(t, cyl(0.0, 0.05, 0.14), Vector3(0.36 * s, 0.73, 0.02), tusk, Vector3(0, 0, -0.3 * s))
+		var k := "l" if s < 0 else "r"
+		part(t, sphere(0.15, 0.8), Vector3(0.32 * s, 0.6, 0.0), plate)
+		part(t, cyl(0.0, 0.04, 0.22), Vector3(0.38 * s, 0.72, 0.04), chrome, Vector3(0.3, 0, -0.5 * s))
+		part(r["knee_" + k], box(0.14, 0.32, 0.15), Vector3(0, -0.2, -0.02), plate)
+		part(r["el_" + k], cyl(0.09, 0.07, 0.22), Vector3(0, -0.15, 0), plate)
+		part(t, sphere(0.04, 1.4), Vector3(0.12 * s, 0.25, -0.24), oil)                          # oil drips
 	var n: Node3D = r.neck
-	n.position = Vector3(0, 0.62, -0.18)
-	part(n, sphere(0.14, 0.95), Vector3(0, 0.08, -0.04), skin)
-	part(n, box(0.2, 0.08, 0.12), Vector3(0, 0.02, -0.12), dark)
+	n.position = Vector3(0, 0.6, -0.2)
+	part(n, sphere(0.13, 1.25), Vector3(0, 0.1, -0.04), plate)                                    # porcelain skull
+	part(n, box(0.15, 0.06, 0.1), Vector3(0, 0.0, -0.12), sinew)                                    # exposed jaw
+	for k in 5:
+		part(n, box(0.012, 0.04, 0.012), Vector3(-0.05 + k * 0.025, 0.035, -0.17), chrome)
 	for s in [-1, 1]:
-		part(n, cyl(0.0, 0.03, 0.14), Vector3(0.07 * s, 0.1, -0.17), tusk, Vector3(0.3, 0, 0.25 * s))
-		eye(n, Vector3(0.05 * s, 0.13, -0.15), 0.022, Color(1, 0.55, 0.1))
+		eye(n, Vector3(0.045 * s, 0.13, -0.14), 0.022, Color(1, 0.9, 0.3))
+	part(n, sphere(0.03, 1.6), Vector3(0.03, 0.08, -0.17), oil)
 	var g := grip(r.hand_r)
-	part(g, cyl(0.07, 0.035, 0.9), Vector3(0, 0.4, 0), mat(Color(0.35, 0.24, 0.14), 0.9))
-	for k in 4:
-		var a := k * PI / 2
-		part(g, cyl(0.0, 0.025, 0.1), Vector3(cos(a) * 0.07, 0.72, sin(a) * 0.07), tusk, Vector3(sin(a) * 1.3, a, -cos(a) * 1.3))
+	part(g, box(0.03, 0.9, 0.11), Vector3(0, 0.42, 0), chrome)                                      # arm blade
+	part(g, cyl(0.0, 0.055, 0.16), Vector3(0, 0.95, 0), chrome)
+	part(g, box(0.05, 0.12, 0.13), Vector3(0, 0.0, 0), plate)
 	r.scale = 1.3
 	return r
 
 
+## Abyssal demon: black-red hide, great horns, bat wings, hooves and a jagged cleaver.
 func _warden() -> Dictionary:
-	var plate := mat(Color(0.3, 0.42, 0.45), 0.4, 0.75)
-	var dark := mat(Color(0.12, 0.16, 0.18), 0.6, 0.5)
-	var cloth := mat(Color(0.12, 0.22, 0.24), 0.95)
-	var bone := mat(Color(0.82, 0.86, 0.85), 0.5)
-	var r := humanoid({"arm_mat": dark, "leg_mat": dark, "limb": 0.07, "leg": 0.08, "shoulders": 0.25, "foot_mat": plate})
+	var hide := mat(Color(0.22, 0.07, 0.06), 0.7)
+	var dark := mat(Color(0.1, 0.04, 0.04), 0.8)
+	var wing := mat(Color(0.3, 0.09, 0.07), 0.8)
+	var horn := mat(Color(0.82, 0.76, 0.62), 0.5)
+	var iron := mat(Color(0.25, 0.24, 0.24), 0.45, 0.8)
+	var r := humanoid({"arm_mat": hide, "leg_mat": hide, "limb": 0.08, "leg": 0.09, "shoulders": 0.27, "foot_mat": dark})
 	var t: Node3D = r.torso
-	part(t, box(0.42, 0.5, 0.28), Vector3(0, 0.38, 0), plate)
-	part(t, box(0.3, 0.22, 0.24), Vector3(0, 0.08, 0), dark)
-	part(t, box(0.3, 0.7, 0.03), Vector3(0, -0.12, -0.15), cloth)
-	part(t, box(0.5, 0.9, 0.03), Vector3(0, 0.05, 0.17), cloth, Vector3(-0.1, 0, 0))
+	t.rotation.x = 0.12
+	part(t, capsule(0.21, 0.66), Vector3(0, 0.33, 0), hide)
+	part(t, sphere(0.2, 0.8), Vector3(0, 0.46, -0.08), hide, Vector3.ZERO, Vector3(1.25, 1, 1))     # chest
+	part(t, cyl(0.2, 0.26, 0.3), Vector3(0, -0.06, 0), dark)                                       # loincloth
+	for i in 3:
+		part(t, box(0.24, 0.03, 0.06), Vector3(0, 0.15 + i * 0.07, -0.19), dark)                   # belly ridges
 	for s in [-1, 1]:
-		part(t, sphere(0.16, 0.75), Vector3(0.3 * s, 0.58, 0), plate)
-		part(t, cyl(0.0, 0.04, 0.16), Vector3(0.36 * s, 0.68, 0), bone, Vector3(0, 0, -0.5 * s))
-		part(r["knee_" + ("l" if s < 0 else "r")], box(0.15, 0.3, 0.16), Vector3(0, -0.2, -0.01), plate)
-		part(r["el_" + ("l" if s < 0 else "r")], cyl(0.09, 0.07, 0.2), Vector3(0, -0.17, 0), plate)
+		var k := "l" if s < 0 else "r"
+		part(t, sphere(0.13, 0.85), Vector3(0.27 * s, 0.58, 0), hide)
+		# bat wing: an arm of bone and two membranes
+		var w := joint(t, Vector3(0.12 * s, 0.56, 0.16))
+		w.rotation = Vector3(0.35, 0.55 * s, 0.5 * s)
+		part(w, cyl(0.02, 0.03, 0.75), Vector3(0.3 * s, 0.25, 0.0), horn, Vector3(0, 0, -1.0 * s))
+		part(w, box(0.62, 0.55, 0.012), Vector3(0.33 * s, 0.05, 0.02), wing, Vector3(0, 0, -0.25 * s))
+		part(w, box(0.4, 0.45, 0.012), Vector3(0.5 * s, -0.15, 0.03), wing, Vector3(0, 0, 0.35 * s))
+		part(r["knee_" + k], cyl(0.06, 0.09, 0.12), Vector3(0, -r.thigh_len + 0.05, 0), dark)    # hooves
 	var n: Node3D = r.neck
-	part(n, sphere(0.14, 1.1), Vector3(0, 0.15, 0), plate)
-	part(n, box(0.2, 0.03, 0.04), Vector3(0, 0.15, -0.13), dark)
+	part(n, sphere(0.13, 1.05), Vector3(0, 0.14, -0.01), hide)
+	part(n, box(0.15, 0.07, 0.1), Vector3(0, 0.05, -0.1), dark)
 	for s in [-1, 1]:
-		eye(n, Vector3(0.045 * s, 0.155, -0.14), 0.022, Color(0.4, 1, 1))
-		part(n, cyl(0.0, 0.045, 0.3), Vector3(0.14 * s, 0.32, 0), bone, Vector3(0, 0, -0.7 * s))
+		eye(n, Vector3(0.045 * s, 0.16, -0.12), 0.024, Color(1, 0.55, 0.1))
+		var h := joint(n, Vector3(0.08 * s, 0.25, 0.0))
+		part(h, cyl(0.025, 0.05, 0.24), Vector3(0.06 * s, 0.08, 0.02), horn, Vector3(0.2, 0, -0.9 * s))
+		part(h, cyl(0.0, 0.025, 0.22), Vector3(0.2 * s, 0.22, 0.02), horn, Vector3(-0.3, 0, -0.1 * s))
 	var g := grip(r.hand_r)
-	part(g, cyl(0.025, 0.025, 2.0), Vector3(0, 0.5, 0), mat(Color(0.3, 0.22, 0.15)))
-	part(g, box(0.035, 0.32, 0.26), Vector3(0, 1.3, -0.13), mat(Color(0.7, 0.74, 0.76), 0.3, 0.85))
-	part(g, cyl(0.0, 0.03, 0.3), Vector3(0, 1.62, 0), mat(Color(0.7, 0.74, 0.76), 0.3, 0.85))
+	part(g, cyl(0.025, 0.025, 0.3), Vector3.ZERO, dark)
+	part(g, box(0.035, 0.9, 0.2), Vector3(0, 0.55, -0.05), iron)
+	for k in 4:
+		part(g, cyl(0.0, 0.03, 0.1), Vector3(0, 0.25 + k * 0.2, -0.17), iron, Vector3(-PI / 2, 0, 0))   # jagged edge
 	r.scale = 1.25
 	return r
 
@@ -745,26 +771,28 @@ func _gloomhound() -> Dictionary:
 	return r
 
 
+## Carrion beetle: a glossy split carapace, mandibles and six legs.
 func _quillback() -> Dictionary:
-	var hide := mat(Color(0.42, 0.32, 0.22), 0.9)
-	var quill := mat(Color(0.86, 0.8, 0.62), 0.5)
-	var tip := mat(Color(0.25, 0.12, 0.1), 0.6)
-	var r := quad({"leg_mat": hide, "hip_h": 0.36, "len": 0.7, "leg": 0.05, "width": 0.16})
+	var shell := mat(Color(0.12, 0.16, 0.12), 0.25, 0.3)
+	var under := mat(Color(0.22, 0.17, 0.12), 0.8)
+	var leg := mat(Color(0.12, 0.09, 0.07), 0.6)
+	var r := quad({"leg_mat": leg, "hip_h": 0.3, "len": 0.7, "leg": 0.03, "width": 0.2})
 	var t: Node3D = r.torso
-	part(t, sphere(0.3, 0.75), Vector3(0, 0.06, 0), hide, Vector3.ZERO, Vector3(1, 1, 1.35))
-	for i in 22:
-		var a := i * 2.4
-		var row := float(i % 6) / 5.0
-		var pos := Vector3(cos(a) * 0.2 * (0.4 + row * 0.6), 0.2 + row * 0.05, -0.25 + float(i) / 22.0 * 0.5)
-		var rot := Vector3(0.9 + sin(i * 1.7) * 0.2, 0, cos(a) * 0.6)
-		part(t, cyl(0.0, 0.022, 0.32), pos, quill, rot)
-	var n: Node3D = r.neck
-	part(n, sphere(0.13, 0.85), Vector3(0, 0.02, -0.08), hide)
-	part(n, sphere(0.06), Vector3(0, -0.02, -0.2), tip)
+	part(t, sphere(0.26, 0.6), Vector3(0, 0.0, 0.02), under, Vector3.ZERO, Vector3(1, 1, 1.4))
 	for s in [-1, 1]:
-		eye(n, Vector3(0.06 * s, 0.06, -0.17), 0.02, Color(1, 0.7, 0.2))
-	part(r.tail, cyl(0.01, 0.04, 0.2), Vector3(0, 0, 0.1), hide, Vector3(1.2, 0, 0))
-	r.scale = 1.0
+		part(t, sphere(0.2, 0.7), Vector3(0.11 * s, 0.1, 0.08), shell, Vector3(0, 0, 0.15 * s), Vector3(0.75, 1, 1.75))   # wing case
+		for k in 2:
+			var lg := joint(t, Vector3(0.18 * s, -0.04, -0.02 + k * 0.1))
+			part(lg, cyl(0.02, 0.03, 0.3), Vector3(0.12 * s, -0.08, 0), leg, Vector3(0, 0, -1.0 * s))   # the middle legs
+	part(t, box(0.012, 0.1, 0.6), Vector3(0, 0.17, 0.08), mat(Color(0.3, 0.4, 0.3), 0.2, 0.4))         # seam glint
+	var n: Node3D = r.neck
+	part(n, sphere(0.12, 0.7), Vector3(0, -0.02, -0.06), shell)
+	for s in [-1, 1]:
+		eye(n, Vector3(0.07 * s, 0.03, -0.12), 0.02, Color(0.6, 1, 0.3))
+		part(n, cyl(0.0, 0.025, 0.16), Vector3(0.05 * s, -0.04, -0.2), leg, Vector3(PI / 2, 0.5 * s, 0))   # mandibles
+		part(n, cyl(0.004, 0.008, 0.25), Vector3(0.04 * s, 0.08, -0.16), leg, Vector3(-0.6, 0, -0.4 * s))  # feelers
+	part(r.tail, sphere(0.06), Vector3(0, -0.02, 0.05), under)
+	r.scale = 1.05
 	return r
 
 
@@ -797,97 +825,116 @@ func _wraith() -> Dictionary:
 	return r
 
 
-## Masked cultist with a long spear.
+## Black knight: blackened plate, a violet tabard, a slit helm with a red glow, a long spear.
 func _zealot() -> Dictionary:
-	var robe := mat(Color(0.45, 0.08, 0.06), 0.95)
-	var black := mat(Color(0.1, 0.08, 0.08), 0.9)
-	var mask := mat(Color(0.85, 0.8, 0.68), 0.5)
-	var r := humanoid({"arm_mat": robe, "fore_mat": black, "leg_mat": black, "hand_mat": black, "foot_mat": black})
+	var plate := mat(Color(0.1, 0.1, 0.12), 0.3, 0.8)
+	var plate_d := mat(Color(0.05, 0.05, 0.06), 0.4, 0.7)
+	var violet := mat(Color(0.3, 0.08, 0.36), 0.9)
+	var gold := mat(Color(0.7, 0.55, 0.28), 0.35, 0.8)
+	var r := humanoid({"arm_mat": plate, "fore_mat": plate_d, "leg_mat": plate_d, "hand_mat": plate, "foot_mat": plate, "limb": 0.065, "leg": 0.075})
 	var t: Node3D = r.torso
-	part(t, capsule(0.165, 0.62), Vector3(0, 0.3, 0), robe)
-	part(t, cyl(0.17, 0.28, 0.55), Vector3(0, -0.2, 0), robe)
-	part(t, box(0.1, 0.62, 0.02), Vector3(0, 0.15, -0.17), black)
-	part(t, torus(0.16, 0.2), Vector3(0, 0.07, 0), black, Vector3.ZERO, Vector3(1, 0.55, 0.9))
-	var n: Node3D = r.neck
-	part(n, sphere(0.14), Vector3(0, 0.15, 0.02), robe)
-	part(n, cyl(0.0, 0.13, 0.3), Vector3(0, 0.33, 0.05), robe, Vector3(0.25, 0, 0))
-	part(n, box(0.15, 0.17, 0.04), Vector3(0, 0.13, -0.11), mask)
+	part(t, capsule(0.18, 0.62), Vector3(0, 0.31, 0), plate)
+	part(t, box(0.24, 0.85, 0.02), Vector3(0, 0.05, -0.18), violet)                                  # tabard
+	part(t, box(0.4, 0.8, 0.02), Vector3(0, 0.12, 0.18), violet, Vector3(-0.08, 0, 0))               # cape
+	part(t, torus(0.17, 0.21), Vector3(0, 0.07, 0), gold, Vector3.ZERO, Vector3(1, 0.5, 0.9))
 	for s in [-1, 1]:
-		eye(n, Vector3(0.035 * s, 0.15, -0.135), 0.018, Color(1, 0.35, 0.2))
+		part(t, sphere(0.13, 0.8), Vector3(0.24 * s, 0.57, 0), plate)
+		part(t, cyl(0.0, 0.03, 0.14), Vector3(0.28 * s, 0.68, 0), plate_d, Vector3(0, 0, -0.4 * s))
+		part(r["knee_" + ("l" if s < 0 else "r")], box(0.14, 0.28, 0.15), Vector3(0, -0.19, -0.01), plate)
+	var n: Node3D = r.neck
+	part(n, cyl(0.12, 0.13, 0.26), Vector3(0, 0.15, 0), plate)
+	part(n, sphere(0.12, 0.7), Vector3(0, 0.28, 0), plate)
+	part(n, box(0.17, 0.025, 0.03), Vector3(0, 0.17, -0.12), mat(Color(0.02, 0.02, 0.02)))
+	part(n, box(0.025, 0.12, 0.03), Vector3(0, 0.1, -0.12), mat(Color(0.02, 0.02, 0.02)))
+	part(n, box(0.02, 0.1, 0.24), Vector3(0, 0.36, 0.02), violet)                                    # crest
+	for s in [-1, 1]:
+		eye(n, Vector3(0.04 * s, 0.17, -0.125), 0.016, Color(1, 0.15, 0.1))
 	var g := grip(r.hand_r)
-	part(g, cyl(0.02, 0.02, 1.9), Vector3(0, 0.45, 0), mat(Color(0.3, 0.22, 0.14)))
-	part(g, cyl(0.0, 0.045, 0.28), Vector3(0, 1.52, 0), mat(Color(0.7, 0.7, 0.72), 0.3, 0.8))
-	part(g, box(0.1, 0.12, 0.01), Vector3(0, 1.32, 0), robe)
+	part(g, cyl(0.02, 0.02, 1.9), Vector3(0, 0.45, 0), mat(Color(0.12, 0.1, 0.1)))
+	part(g, cyl(0.0, 0.045, 0.3), Vector3(0, 1.53, 0), mat(Color(0.55, 0.55, 0.6), 0.3, 0.8))
+	part(g, box(0.1, 0.14, 0.01), Vector3(0, 1.3, 0), violet)
+	r.scale = 1.02
+	return r
+
+
+## Vampire warrior: pale skin, long white hair, fangs, black-and-crimson leather, a curved blade.
+func _reaver() -> Dictionary:
+	var skin := mat(Color(0.84, 0.82, 0.84), 0.6)
+	var leather := mat(Color(0.1, 0.07, 0.08), 0.7)
+	var crimson := mat(Color(0.5, 0.06, 0.08), 0.7)
+	var hair := mat(Color(0.92, 0.9, 0.88), 0.8)
+	var steel := mat(Color(0.72, 0.72, 0.76), 0.25, 0.85)
+	var r := humanoid({"arm_mat": crimson, "fore_mat": leather, "leg_mat": leather, "hand_mat": skin, "limb": 0.06, "leg": 0.07, "shoulders": 0.23, "foot_mat": mat(Color(0.06, 0.05, 0.05))})
+	var t: Node3D = r.torso
+	t.rotation.x = 0.12
+	part(t, capsule(0.17, 0.62), Vector3(0, 0.3, 0), leather)
+	part(t, box(0.3, 0.32, 0.06), Vector3(0, 0.4, -0.14), crimson)
+	part(t, cyl(0.18, 0.26, 0.42), Vector3(0, -0.15, 0), leather)                                    # long coat skirt
+	part(t, box(0.42, 0.85, 0.02), Vector3(0, 0.12, 0.17), crimson, Vector3(-0.1, 0, 0))             # cape
+	for s in [-1, 1]:
+		part(t, sphere(0.11, 0.75), Vector3(0.22 * s, 0.57, 0), leather)
+		part(t, cyl(0.0, 0.025, 0.12), Vector3(0.25 * s, 0.67, 0), steel, Vector3(0, 0, -0.5 * s))
+	var n: Node3D = r.neck
+	part(n, sphere(0.1, 1.1), Vector3(0, 0.13, -0.01), skin)
+	part(n, sphere(0.108, 0.9), Vector3(0, 0.17, 0.025), hair)
+	part(n, box(0.17, 0.36, 0.05), Vector3(0, -0.02, 0.08), hair, Vector3(0.15, 0, 0))
+	for s in [-1, 1]:
+		eye(n, Vector3(0.037 * s, 0.14, -0.09), 0.018, Color(1, 0.1, 0.1))
+		part(n, cyl(0.0, 0.008, 0.035), Vector3(0.02 * s, 0.05, -0.09), mat(Color(1, 1, 0.95)), Vector3(PI, 0, 0))   # fangs
+	var g := grip(r.hand_r)
+	part(g, cyl(0.02, 0.02, 0.16), Vector3.ZERO, leather)
+	part(g, box(0.18, 0.03, 0.04), Vector3(0, 0.09, 0), crimson)
+	part(g, box(0.05, 0.42, 0.012), Vector3(0, 0.32, 0), steel, Vector3(0, 0, 0.0))
+	part(g, box(0.045, 0.36, 0.012), Vector3(-0.04, 0.68, 0), steel, Vector3(0, 0, 0.25))           # curved tip
+	r.scale = 1.05
+	return r
+
+
+## Specter: a hooded rider of the dark with ragged wings, hovering, eyes burning violet.
+func _moonsister() -> Dictionary:
+	var cloak := mat(Color(0.08, 0.07, 0.1), 0.95)
+	var rag := mat(Color(0.16, 0.13, 0.18), 0.95)
+	var wing := mat(Color(0.12, 0.1, 0.14), 0.9)
+	var bone := mat(Color(0.75, 0.72, 0.68), 0.6)
+	var r := humanoid({"arm_mat": cloak, "leg_mat": cloak, "hide_legs": true, "limb": 0.05, "hand_mat": bone, "shoulders": 0.2})
+	var hips: Node3D = r.hips
+	part(hips, cyl(0.17, 0.04, 0.8), Vector3(0, -0.38, 0.04), cloak)
+	for i in 6:
+		var a := i * TAU / 6.0
+		part(hips, box(0.08, 0.42, 0.015), Vector3(cos(a) * 0.12, -0.55, sin(a) * 0.12), rag, Vector3(0, -a, 0.18))
+	var t: Node3D = r.torso
+	t.rotation.x = 0.18
+	part(t, capsule(0.16, 0.6), Vector3(0, 0.3, 0), cloak)
+	for s in [-1, 1]:
+		var w := joint(t, Vector3(0.1 * s, 0.5, 0.14))
+		w.rotation = Vector3(0.3, 0.5 * s, 0.4 * s)
+		part(w, cyl(0.015, 0.025, 0.7), Vector3(0.28 * s, 0.22, 0), bone, Vector3(0, 0, -1.0 * s))
+		for k in 3:
+			part(w, box(0.2, 0.5 - k * 0.08, 0.01), Vector3((0.2 + k * 0.17) * s, -0.02 - k * 0.04, 0.02), wing, Vector3(0, 0, (0.15 - k * 0.12) * s))
+		part(r["el_" + ("l" if s < 0 else "r")], cyl(0.09, 0.055, 0.24), Vector3(0, -0.2, 0), cloak)
+	var n: Node3D = r.neck
+	part(n, sphere(0.1), Vector3(0, 0.12, 0), mat(Color(0.01, 0.01, 0.02)))
+	part(n, sphere(0.15), Vector3(0, 0.15, 0.03), cloak, Vector3.ZERO, Vector3(1, 1.2, 1.05))
+	part(n, cyl(0.0, 0.11, 0.24), Vector3(0, 0.33, 0.1), cloak, Vector3(0.8, 0, 0))
+	for s in [-1, 1]:
+		eye(n, Vector3(0.04 * s, 0.13, -0.09), 0.026, Color(0.8, 0.4, 1.0))
+	r.float = true
 	r.scale = 1.0
 	return r
 
 
-## Goat-headed raider with an axe.
-func _reaver() -> Dictionary:
-	var fur := mat(Color(0.38, 0.28, 0.2), 1.0)
-	var dark := mat(Color(0.2, 0.15, 0.11), 0.95)
-	var horn := mat(Color(0.75, 0.68, 0.55), 0.5)
-	var hide := mat(Color(0.55, 0.45, 0.35), 0.85)
-	var r := humanoid({"arm_mat": fur, "leg_mat": dark, "limb": 0.065, "leg": 0.075, "shoulders": 0.25, "foot_mat": mat(Color(0.12, 0.1, 0.08))})
-	var t: Node3D = r.torso
-	t.rotation.x = 0.15
-	part(t, capsule(0.19, 0.64), Vector3(0, 0.3, 0), fur)
-	part(t, box(0.36, 0.3, 0.1), Vector3(0, 0.4, -0.14), hide)
-	part(t, cyl(0.2, 0.27, 0.3), Vector3(0, -0.07, 0), dark)
-	for s in [-1, 1]:
-		part(t, sphere(0.11, 0.8), Vector3(0.24 * s, 0.56, 0), hide)
-	var n: Node3D = r.neck
-	n.rotation.x = -0.2
-	part(n, sphere(0.12, 1.1), Vector3(0, 0.14, 0), fur)
-	part(n, cyl(0.045, 0.08, 0.2), Vector3(0, 0.08, -0.13), fur, Vector3(PI / 2 + 0.4, 0, 0))
-	part(n, box(0.06, 0.08, 0.04), Vector3(0, -0.02, -0.12), dark)                          # beard
-	for s in [-1, 1]:
-		var h := joint(n, Vector3(0.08 * s, 0.24, 0.0))
-		part(h, cyl(0.02, 0.04, 0.2), Vector3(0.04 * s, 0.06, 0.06), horn, Vector3(0.7, 0, -0.5 * s))
-		part(h, cyl(0.0, 0.02, 0.16), Vector3(0.09 * s, 0.05, 0.19), horn, Vector3(1.9, 0, -0.4 * s))
-		part(n, cyl(0.0, 0.035, 0.12), Vector3(0.12 * s, 0.14, 0.0), fur, Vector3(0, 0, -1.4 * s))
-		eye(n, Vector3(0.05 * s, 0.17, -0.09), 0.02, Color(1, 0.85, 0.3))
-	var g := grip(r.hand_r)
-	part(g, cyl(0.022, 0.026, 0.85), Vector3(0, 0.3, 0), mat(Color(0.3, 0.22, 0.14)))
-	part(g, cyl(0.17, 0.17, 0.03, 12), Vector3(0, 0.65, -0.16), mat(Color(0.5, 0.48, 0.45), 0.4, 0.7), Vector3(0, 0, PI / 2), Vector3(1, 1, 0.55))
-	r.scale = 1.1
-	return r
-
-
-## Fallen huntress with a bow.
-func _moonsister() -> Dictionary:
-	var cloak := mat(Color(0.2, 0.22, 0.3), 0.95)
-	var leather := mat(Color(0.32, 0.25, 0.22), 0.8)
-	var skin := mat(Color(0.62, 0.62, 0.7), 0.7)
-	var hair := mat(Color(0.85, 0.85, 0.9), 0.8)
-	var r := humanoid({"arm_mat": leather, "fore_mat": skin, "leg_mat": leather, "hand_mat": skin, "limb": 0.05, "leg": 0.06, "shoulders": 0.19, "foot_mat": mat(Color(0.15, 0.12, 0.12))})
-	var t: Node3D = r.torso
-	part(t, capsule(0.14, 0.58), Vector3(0, 0.3, 0), leather)
-	part(t, cyl(0.15, 0.22, 0.3), Vector3(0, -0.08, 0), cloak)
-	part(t, box(0.44, 0.9, 0.03), Vector3(0, 0.08, 0.16), cloak, Vector3(-0.12, 0, 0))
-	part(t, cyl(0.05, 0.045, 0.4), Vector3(-0.09, 0.4, 0.12), leather, Vector3(0.2, 0, 0.35))
-	var n: Node3D = r.neck
-	part(n, sphere(0.1), Vector3(0, 0.13, -0.01), skin)
-	part(n, sphere(0.106, 0.9), Vector3(0, 0.16, 0.02), hair)
-	part(n, box(0.08, 0.3, 0.04), Vector3(0, 0.0, 0.08), hair, Vector3(0.2, 0, 0))
-	part(n, sphere(0.13), Vector3(0, 0.15, 0.04), cloak, Vector3.ZERO, Vector3(1, 1.05, 1.05))
-	for s in [-1, 1]:
-		eye(n, Vector3(0.04 * s, 0.14, -0.095), 0.018, Color(0.75, 0.6, 1.0))
-	bow(r.hand_l, mat(Color(0.25, 0.2, 0.3)))
-	r.scale = 0.98
-	return r
-
-
-## Bloated thing that spits bile.
+## Bloated plague-thing that spits bile.
 func _spitter() -> Dictionary:
-	var skin := mat(Color(0.55, 0.58, 0.3), 0.6)
-	var dark := mat(Color(0.32, 0.35, 0.16), 0.75)
+	var skin := mat(Color(0.5, 0.55, 0.3), 0.6)
+	var dark := mat(Color(0.3, 0.33, 0.15), 0.75)
 	var r := humanoid({"arm_mat": skin, "leg_mat": dark, "limb": 0.05, "leg": 0.085, "hip_h": 0.5, "chest_h": 0.5, "shoulders": 0.32, "arm_len": 0.24, "foot_mat": dark})
 	var t: Node3D = r.torso
 	part(t, sphere(0.42), Vector3(0, 0.22, 0), skin, Vector3.ZERO, Vector3(1, 0.95, 1.05))
 	for i in 7:
 		var a := i * 1.7
 		part(t, sphere(0.07), Vector3(cos(a) * 0.36, 0.2 + sin(i * 2.3) * 0.18, sin(a) * 0.36), mat(Color(0.75, 0.7, 0.25), 0.4), Vector3.ZERO, Vector3.ONE, Color(0.55, 0.65, 0.1, 1))
+	for i in 4:
+		part(t, box(0.04, 0.3, 0.04), Vector3(-0.15 + i * 0.1, 0.25, 0.4), mat(Color(0.8, 0.76, 0.62)), Vector3(-0.3, 0, 0))   # ribs breaking through
 	var n: Node3D = r.neck
 	n.position = Vector3(0, 0.5, -0.24)
 	part(n, sphere(0.15, 0.85), Vector3(0, 0.06, -0.04), skin)
@@ -898,30 +945,37 @@ func _spitter() -> Dictionary:
 	return r
 
 
-## Walking deadwood: bark, moss, thorns, ember eyes.
+## Gurmag angler: a hunched fish-horror of the swamp with a huge toothed jaw, back fins and a
+## glowing lure on a stalk.
 func _thornback() -> Dictionary:
-	var bark := mat(Color(0.3, 0.22, 0.15), 1.0)
-	var moss := mat(Color(0.22, 0.32, 0.14), 1.0)
-	var thorn := mat(Color(0.5, 0.42, 0.3), 0.7)
-	var r := humanoid({"arm_mat": bark, "leg_mat": bark, "limb": 0.1, "leg": 0.12, "hip_h": 0.85, "chest_h": 0.75, "shoulders": 0.36, "arm_len": 0.42, "foot_mat": bark})
+	var skin := mat(Color(0.28, 0.33, 0.3), 0.55)
+	var belly := mat(Color(0.5, 0.52, 0.42), 0.6)
+	var fin := mat(Color(0.2, 0.26, 0.24), 0.6)
+	var tooth := mat(Color(0.9, 0.88, 0.75), 0.4)
+	var r := humanoid({"arm_mat": skin, "leg_mat": skin, "limb": 0.1, "leg": 0.12, "hip_h": 0.8, "chest_h": 0.72, "shoulders": 0.36, "arm_len": 0.44, "foot_mat": fin})
 	var t: Node3D = r.torso
-	t.rotation.x = 0.25
-	part(t, cyl(0.28, 0.24, 0.85), Vector3(0, 0.38, 0), bark, Vector3.ZERO, Vector3(1, 1, 0.8))
-	part(t, sphere(0.22), Vector3(0.1, 0.72, 0.05), moss)
-	part(t, sphere(0.16), Vector3(-0.15, 0.3, -0.12), moss)
-	for i in 10:
-		var a := i * 2.1
-		part(t, cyl(0.0, 0.04, 0.24), Vector3(cos(a) * 0.25, 0.15 + i * 0.07, sin(a) * 0.2), thorn, Vector3(sin(a) * 1.2, 0, -cos(a) * 1.2))
+	t.rotation.x = 0.45
+	part(t, sphere(0.34, 1.25), Vector3(0, 0.38, 0), skin)
+	part(t, sphere(0.27, 1.1), Vector3(0, 0.3, -0.12), belly)
+	for i in 5:
+		part(t, box(0.02, 0.24 - i * 0.02, 0.2), Vector3(0, 0.5 + i * 0.08, 0.26 - i * 0.04), fin, Vector3(-0.4, 0, 0))   # back fin
 	for s in [-1, 1]:
 		var k := "l" if s < 0 else "r"
-		part(r["hand_" + k], sphere(0.14, 0.9), Vector3(0, -0.05, 0), bark)
+		part(r["hand_" + k], sphere(0.13, 0.8), Vector3(0, -0.05, 0), skin)
 		for c in 3:
-			part(r["hand_" + k], cyl(0.0, 0.03, 0.2), Vector3((c - 1) * 0.06, -0.18, -0.02), thorn, Vector3(0.3, 0, 0))
-		part(t, cyl(0.02, 0.05, 0.45), Vector3(0.22 * s, 0.95, 0.05), bark, Vector3(0, 0, -0.45 * s))  # antler branches
+			part(r["hand_" + k], cyl(0.0, 0.025, 0.18), Vector3((c - 1) * 0.06, -0.17, -0.02), tooth, Vector3(0.3, 0, 0))
+		part(t, box(0.2, 0.02, 0.16), Vector3(0.33 * s, 0.45, 0.05), fin, Vector3(0, 0.3 * s, -0.6 * s))   # side fins
 	var n: Node3D = r.neck
-	part(n, sphere(0.15, 1.1), Vector3(0, 0.1, -0.06), bark)
+	n.position = Vector3(0, 0.62, -0.22)
+	part(n, sphere(0.2, 0.75), Vector3(0, 0.1, -0.06), skin)
+	part(n, box(0.34, 0.08, 0.26), Vector3(0, -0.02, -0.15), belly)                                    # jaw
+	for k in 7:
+		part(n, cyl(0.0, 0.02, 0.07), Vector3(-0.14 + k * 0.047, 0.04, -0.27), tooth)
 	for s in [-1, 1]:
-		eye(n, Vector3(0.06 * s, 0.13, -0.19), 0.03, Color(1, 0.6, 0.15))
+		eye(n, Vector3(0.12 * s, 0.17, -0.12), 0.028, Color(1, 0.85, 0.3))
+	var lure := joint(n, Vector3(0, 0.22, -0.02))
+	part(lure, cyl(0.008, 0.015, 0.4), Vector3(0, 0.12, -0.12), fin, Vector3(-0.8, 0, 0))
+	part(lure, sphere(0.05), Vector3(0, 0.22, -0.32), glow_mat(Color(0.6, 1, 0.8)), Vector3.ZERO, Vector3.ONE, Color(0.5, 1, 0.75, 1))
 	r.scale = 1.35
 	return r
 
