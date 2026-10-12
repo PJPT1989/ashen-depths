@@ -134,6 +134,8 @@ func _ready() -> void:
 		light = Game.make_light(240.0 if is_boss else 130.0, c, 0.6)
 		light.position = Vector2(0, -30)
 		add_child(light)
+		light.add_to_group("minor_lights")  # off in low quality
+		light.visible = not Game.low_quality
 
 
 func _process(dt: float) -> void:

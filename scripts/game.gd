@@ -16,6 +16,12 @@ const RANK_TINTS := [Color(1, 1, 1), Color(0.6, 0.8, 0.35), Color(1, 0.7, 0.3), 
 	Color(1, 0.45, 0.15), Color(0.55, 1, 1)]
 
 var muted := false
+## Low quality, for slow computers: no shadows, one light instead of each shadowed pair, no
+## monster glow lights or normal maps, a cheap finishing pass and no drifting embers. L toggles it; saved in user://settings.cfg.
+signal quality_changed
+const SETTINGS := "user://settings.cfg"
+var low_quality := false
+var quality_chosen := false  # the player picked a setting, so the automatic switch leaves it alone
 var font_display: Font
 var font_body: Font
 var font_bold: Font
@@ -36,6 +42,10 @@ func _ready() -> void:
 	add_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	add_material.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
 	_register_inputs()
+	var cfg := ConfigFile.new()
+	if cfg.load(SETTINGS) == OK:
+		low_quality = cfg.get_value("video", "low_quality", false)
+		quality_chosen = cfg.get_value("video", "chosen", false)
 	_build_sounds()
 	for i in 10:
 		var p := AudioStreamPlayer.new()
@@ -92,7 +102,42 @@ func make_light_pair(parent: Node2D, diameter: float, color: Color, energy: floa
 	b.position = offset + Vector2(0, -10)
 	parent.add_child(a)
 	parent.add_child(b)
+	a.set_meta("twin", b)
+	a.add_to_group("light_pairs")
+	_apply_quality(a)
 	return [a, b]
+
+
+## In low quality a pair becomes one unshadowed light that also lights the walls.
+func _apply_quality(a: PointLight2D) -> void:
+	a.shadow_enabled = not low_quality
+	a.range_item_cull_mask = 3 if low_quality else 1
+	var b = a.get_meta("twin")
+	if is_instance_valid(b):
+		b.visible = not low_quality
+
+
+## Normal maps make lights pick out the relief of stone and figures; low quality draws flat.
+func _set_normal(t: CanvasTexture) -> void:
+	t.normal_texture = null if low_quality else load(t.get_meta("normal"))
+
+
+func set_low_quality(on: bool, chosen := true) -> void:
+	low_quality = on
+	quality_chosen = quality_chosen or chosen
+	var cfg := ConfigFile.new()
+	cfg.set_value("video", "low_quality", low_quality)
+	cfg.set_value("video", "chosen", quality_chosen)
+	cfg.save(SETTINGS)
+	for a in get_tree().get_nodes_in_group("light_pairs"):
+		_apply_quality(a)
+	for l in get_tree().get_nodes_in_group("minor_lights"):
+		l.visible = not low_quality
+	for d in _sheets.values():
+		_set_normal(d.tex)
+	for t in _tex_cache.values():
+		_set_normal(t)
+	quality_changed.emit()
 
 
 var _light_tex: GradientTexture2D
@@ -134,7 +179,8 @@ func sheet(type: String) -> Dictionary:
 	if not _sheets.has(type):
 		var t := CanvasTexture.new()
 		t.diffuse_texture = load("res://sprites/%s_color.png" % type)
-		t.normal_texture = load("res://sprites/%s_normal.png" % type)
+		t.set_meta("normal", "res://sprites/%s_normal.png" % type)
+		_set_normal(t)
 		t.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		var layer := type.begins_with("hero_")
 		var cell: int = SPRITE_CELLS["hero" if layer else type]
@@ -155,7 +201,8 @@ func canvas_tex(name: String) -> CanvasTexture:
 	if not _tex_cache.has(name):
 		var t := CanvasTexture.new()
 		t.diffuse_texture = load("res://textures/%s_albedo.png" % name)
-		t.normal_texture = load("res://textures/%s_normal.png" % name)
+		t.set_meta("normal", "res://textures/%s_normal.png" % name)
+		_set_normal(t)
 		t.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		t.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 		_tex_cache[name] = t
@@ -221,7 +268,7 @@ func _register_inputs() -> void:
 		"drink_heal": [KEY_1, KEY_Q], "drink_mana": [KEY_2, KEY_W],
 		"cast_fire": [KEY_F], "cast_nova": [KEY_SPACE],
 		"toggle_inv": [KEY_I, KEY_B], "toggle_char": [KEY_C, KEY_A], "toggle_map": [KEY_TAB],
-		"town_portal": [KEY_T], "toggle_sound": [KEY_M], "close": [KEY_ESCAPE],
+		"town_portal": [KEY_T], "toggle_sound": [KEY_M], "toggle_quality": [KEY_L], "close": [KEY_ESCAPE],
 	}
 	for action in keys:
 		if not InputMap.has_action(action):

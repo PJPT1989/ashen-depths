@@ -15,6 +15,7 @@ A Diablo II-style isometric action RPG: a starting town and the eight areas of A
 | C · I · Tab | Character panel, inventory, automap |
 | T | Open a town portal |
 | M · Esc | Sound, close panels |
+| L | Low quality for slow computers (no shadows, fewer lights; remembered) |
 
 ## Act I
 | # | Area | Kind | Monster rank | Boss |

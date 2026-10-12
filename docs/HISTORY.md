@@ -118,3 +118,17 @@ full resolution (high-DPI and full screen multiply the pixels) most of the rest.
 (`Main.web`, or `-- --web` on desktop) now draws at the base 1280x800 size and scales up, and
 `post_web.gdshader` brightens highlights in place instead of blurring. About 3x the frame rate in
 the benchmark at 1920x1080 (moor 3.2 -> 10.1 fps in software rendering); the desktop build is unchanged.
+
+## 9. Low quality switch (2026-10-12)
+> yes, my particular laptop is very slow... add that feature in there pls
+
+**L** (or the "Quality" button on the title screen) switches low quality on and off; the choice is
+saved in `user://settings.cfg`. Low quality turns off shadows, merges each shadowed light pair into
+one light, drops monster glow lights and normal maps, swaps the finishing pass for
+`post_low.gdshader` (vignette and hurt pulse only) and hides the drifting embers. In the browser,
+if the first five seconds of play average under 24 fps and the player hasn't chosen, the game
+switches to low quality once and says how to switch back. Benchmark (`--web --low`): about 15%
+faster in open areas and 45% in dungeons on top of round 8. Also turned off SDF generation on
+light occluders (unused) and drew small prop polygons with `draw_primitive`. Tried the same for
+textured floor and wall tiles, but in Godot 4.3's compatibility renderer lit `draw_primitive` and
+`draw_mesh` broke the normal-mapped lighting, so those stay `draw_polygon`.

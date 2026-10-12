@@ -38,6 +38,13 @@ func _ready() -> void:
 		[18.5, func():
 			print("AUTOTEST moor fight: level %d, xp %d, gold %d, monsters left %d, drops %d" % [main.player.level, main.player.xp, main.player.gold, main.monsters.size(), main.drops.size()])
 			_shot("moor")],
+		[0.2, func(): Game.set_low_quality(true)],
+		[0.8, func():
+			var pairs := get_tree().get_nodes_in_group("light_pairs")
+			var shadowed := pairs.filter(func(l): return l.shadow_enabled).size()
+			print("AUTOTEST low quality: %d light pairs, %d still shadowed, post %s" % [pairs.size(), shadowed, main.post.shader.resource_path.get_file()])
+			_shot("low_quality")
+			Game.set_low_quality(false)],
 		[0.5, func():
 			main.hud.toggle_char(true)
 			main.hud.toggle_inv(true)],

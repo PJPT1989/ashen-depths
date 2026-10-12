@@ -29,6 +29,7 @@ func setup(t: Vector2i, shade_value: float, area_tint: Color, texture: CanvasTex
 	var occ := LightOccluder2D.new()
 	occ.occluder = _occluder
 	occ.occluder_light_mask = 1
+	occ.sdf_collision = false  # nothing reads the SDF, and building it every frame was costly
 	add_child(occ)
 
 
