@@ -167,7 +167,7 @@ drawn entirely from one small atlas (`Game.prop_atlas`: soft shadow, disc, plain
 one batch. Two Godot 4.3 quirks shaped it: a 4-point `draw_primitive` doesn't draw a quad (so quads
 are two triangles), and a primitive batch keeps its first texture even into the next canvas item
 (so `Game.begin_batch` starts a fresh batch with an invisible rect). Benchmark on the moor at
-1920x1080: about 3,200 draw calls a frame down to about 700 (High) and 350 (Medium); dungeons
+1920x1080: about 3,200 draw calls a frame down to about 700 (High and Medium alike); dungeons
 600 down to 400. A screenshot on the same map layout (`--seed`) matches the old ground pixel for
 pixel. Software rendering here barely notices draw calls, so the gain is for real browsers and GPUs.
 Also fixed: rock highlights and other 4-point prop shapes were drawn as half a shape since round 9.
