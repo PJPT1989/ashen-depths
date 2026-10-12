@@ -105,3 +105,16 @@ build to his own site; rebuild with `tools/export_web.sh`.
 The project moved from a Claude project's shared folder into this repository so any Claude Code
 session can continue it. Added `CLAUDE.md`, this file, the `tools/*.sh` helpers and the cloud
 SessionStart hook. Built zips are not kept in git; regenerate them with the scripts.
+
+## 8. On the Tomano shop, and a faster web build (2026-10-12)
+> I want to add that game to my eshop, under section games
+> is there a way how to improve performance? all the movement seems very "laggy"
+
+The web build now runs on www.tomano.cz under "Hry" (the shop repo copies `build/web` with its
+`tools/game_import.py`). Movement felt laggy because the browser frame rate was low. Added
+`scripts/bench.gd` (`-- --bench [--web] [--area=N] [--off=...]`) to measure what costs what: the
+web bloom (16 screen samples per pixel) took about 40% of the frame, and drawing at the screen's
+full resolution (high-DPI and full screen multiply the pixels) most of the rest. The web build
+(`Main.web`, or `-- --web` on desktop) now draws at the base 1280x800 size and scales up, and
+`post_web.gdshader` brightens highlights in place instead of blurring. About 3x the frame rate in
+the benchmark at 1920x1080 (moor 3.2 -> 10.1 fps in software rendering); the desktop build is unchanged.

@@ -59,6 +59,9 @@ var area_state: Array = []    # per area: visited, waypoint, killed {uid: true},
 var tp = null                 # the open town portal: {"area": i, "wpos": Vector2}
 var stock := {"vendor": [], "healer": []}
 var bosses_killed := 0
+## The browser build (or `-- --web` on desktop, to test it) trades a little sharpness for speed:
+## it draws the game at its base size and scales it up, and skips the bloom.
+var web := OS.has_feature("web") or "--web" in OS.get_cmdline_user_args()
 
 
 func _ready() -> void:
@@ -67,6 +70,8 @@ func _ready() -> void:
 	flat = Node2D.new()
 	add_child(flat)
 	move_child(flat, floor_fx.get_index() + 1)
+	if web:
+		get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
 	_build_post()
 	_build_ambient()
 	new_game()
@@ -75,6 +80,10 @@ func _ready() -> void:
 		var t := preload("res://scripts/autotest.gd").new()
 		t.main = self
 		add_child(t)
+	elif "--bench" in OS.get_cmdline_user_args():
+		var b := preload("res://scripts/bench.gd").new()
+		b.main = self
+		add_child(b)
 
 
 func new_game() -> void:
@@ -898,7 +907,7 @@ func _build_post() -> void:
 	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	post = ShaderMaterial.new()
-	post.shader = load("res://shaders/post_web.gdshader" if OS.has_feature("web") else "res://shaders/post.gdshader")
+	post.shader = load("res://shaders/post_web.gdshader" if web else "res://shaders/post.gdshader")
 	rect.material = post
 	layer.add_child(rect)
 

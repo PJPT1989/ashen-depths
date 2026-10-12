@@ -1,10 +1,10 @@
-// Web version of post.gdshader: same look, but the bloom samples without screen mipmaps (WebGL cannot build them).
-// vignette, film grain, and a red pulse at the edges when the hero is hurt.
+// Web version of post.gdshader: the same grade, vignette, grain and hurt pulse, but the bloom only
+// brightens in place.
+// WebGL cannot build screen mipmaps, and the 16-sample blur that replaced them cost about
+// 40% of the frame in the browser (measured with scripts/bench.gd).
 shader_type canvas_item;
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
-uniform float bloom = 0.55;
-uniform float threshold = 0.5;
 uniform float vignette = 0.6;
 uniform float grain = 0.035;
 uniform float hurt = 0.0;
@@ -13,17 +13,8 @@ void fragment() {
 	vec2 uv = SCREEN_UV;
 	vec3 c = texture(screen_tex, uv).rgb;
 	vec2 px = SCREEN_PIXEL_SIZE;
-	vec3 b = vec3(0.0);
-	// cheap wide blur: mip samples in a small ring
-	for (int i = 0; i < 8; i++) {
-		float a = float(i) * 0.785398;
-		vec2 o = vec2(cos(a), sin(a));
-		b += texture(screen_tex, uv + o * px * 10.0).rgb;
-		b += texture(screen_tex, uv + o * px * 26.0).rgb;
-	}
-	b /= 16.0;
-	b = max(b - threshold, vec3(0.0)) / (1.0 - threshold);
-	c += b * bloom * vec3(1.0, 0.85, 0.7);
+	// stand-in for the bloom: lift the bright parts in place, no blur
+	c += max(c - 0.5, vec3(0.0)) * 1.1 * vec3(1.0, 0.85, 0.7);
 	// grade: a touch more contrast, warm highlights, cool deep shadows
 	float l = dot(c, vec3(0.299, 0.587, 0.114));
 	c = mix(vec3(l), c, 0.95);
