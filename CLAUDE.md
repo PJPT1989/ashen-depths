@@ -30,10 +30,13 @@ made so far and what was built for it; read it before planning bigger work.
 - Run the smoke test after every change and look at the screenshots it saves (Read the PNGs). When a
   feature isn't covered, extend `autotest.gd` with a step and an `AUTOTEST ...` print line.
 - `tools/export_web.sh` builds the browser version into `build/web/` (git-ignored, about 65 MB). It
-  uses the no-threads web template, so any HTTPS host works without special headers. Petr hosts it on
+  uses the no-threads web template, so any HTTPS host works without special headers.
+  `tools/export_web.sh --threads` builds the multi-threaded one into `build/web-mt/` (preset "Web Threads");
+  it needs the page served with COOP `same-origin` and COEP `require-corp` (the shop does this). Petr hosts it on
   his own website; give him the folder as a zip.
 - Frame rate: `xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1920x1080 -- --bench --area=1`
-  (add `--web` for the browser build's settings, `--off=post,lights,...` to see what something costs).
+  (add `--web` for the browser build's settings, `--off=post,lights,...` to see what something costs,
+  `--seed=N --shot=x.png` for a screenshot of the same map layout to compare before and after).
   Software rendering, so compare runs with each other, never with real hardware.
 - Static check without running: `godot --headless --path . --check-only --script res://scripts/x.gd`.
 
@@ -74,6 +77,11 @@ Everything visual is generated from code; there are no hand-made image assets.
 - Data lives in `const` dictionaries/arrays near the top of the script that owns it (`Act.AREAS`,
   item bases and affixes in `items.gd`, monster kinds in `monster.gd`).
 - Most nodes are built in code rather than in `.tscn` files; follow that.
+- Draw calls are what the browser pays for. In `_draw`, each `draw_polygon`, `draw_colored_polygon`,
+  `draw_circle` and antialiased `draw_line` is its own draw call; triangle `draw_primitive`s with the
+  same texture batch. Draw quads with `Game.quad` (a 4-point primitive doesn't come out as a quad in
+  4.3) and call `Game.begin_batch` before a run of primitives whose texture differs from the previous
+  run (4.3 keeps the first texture of a primitive batch). Props draw everything from `Game.prop_atlas`.
 - Graphics quality `Game.quality` (LOW, MEDIUM, HIGH; L cycles it, saved in `user://settings.cfg`,
   applied in `Main._apply_quality`). HIGH: full resolution, `post.gdshader` (`post_bloom_web.gdshader`
   in the browser, which has no screen mipmaps). MEDIUM (the browser's default): base 1280x800 scaled up,

@@ -48,9 +48,10 @@ func _draw() -> void:
 	var rc := base * (0.7 + v * 0.1)
 	lc.a = 1.0
 	rc.a = 1.0
-	draw_polygon(PackedVector2Array([bl, bm, bm + up, bl + up]), PackedColorArray([lc, lc, lc, lc]),
+	Game.begin_batch(self, tex)
+	Game.quad(self, PackedVector2Array([bl, bm, bm + up, bl + up]), lc,
 		PackedVector2Array([Vector2(u0, 1), Vector2(u0 + 0.25, 1), Vector2(u0 + 0.25, 0.3), Vector2(u0, 0.3)]), tex)
-	draw_polygon(PackedVector2Array([bm, br, br + up, bm + up]), PackedColorArray([rc, rc, rc, rc]),
+	Game.quad(self, PackedVector2Array([bm, br, br + up, bm + up]), rc,
 		PackedVector2Array([Vector2(u0 + 0.25, 1), Vector2(u0, 1), Vector2(u0, 0.3), Vector2(u0 + 0.25, 0.3)]), tex)
 	var foot := Color(0, 0, 0, 0.35)
 	draw_line(bl, bm, foot, 3.0)
@@ -66,7 +67,7 @@ func _draw() -> void:
 			for p in [pl, pr]:
 				draw_colored_polygon(PackedVector2Array([p + Vector2(-4, 1), p + Vector2(0, -9), p + Vector2(4, 1)]), tc * 0.8)
 		return
-	draw_polygon(PackedVector2Array([s + up, br + up, bm + up, bl + up]), PackedColorArray([tc, tc, tc, tc]),
+	Game.quad(self, PackedVector2Array([s + up, br + up, bm + up, bl + up]), tc,
 		PackedVector2Array([Vector2(0.5, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0.5, 1)]), tex)
 	draw_polyline(PackedVector2Array([bl + up, s + up, br + up]), Color(1, 0.9, 0.75, 0.08), 1.0)
 	draw_polyline(PackedVector2Array([bl + up, bm + up, br + up]), Color(0, 0, 0, 0.45), 1.0)

@@ -3,6 +3,7 @@ extends Node
 ## --off switches things off to see what they cost: shadows, pcf, lights, particles, occluders,
 ## post, viewport (draw at base size and scale up). --web uses the browser build's settings;
 ## --quality 0 is low, 1 medium (the browser's default), 2 high (the desktop default).
+## --shot=file.png saves the last frame; --seed=N gives the same area layouts every run.
 ## Starts the game in an area, waits, counts frames for a few seconds, prints the result and quits.
 
 var main
@@ -27,6 +28,11 @@ func _ready() -> void:
 			Game.set_quality(int(a.substr(10)))
 	main.hud.title_screen.visible = false
 	main.start_game()
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--seed="):
+			# same area layouts every run, to compare screenshots
+			for i in main.area_seeds.size():
+				main.area_seeds[i] = hash(a + str(i))
 	if area > 0:
 		main.load_area(area, "start")
 	if "viewport" in off:
@@ -90,6 +96,9 @@ func _process(dt: float) -> void:
 				var k: String = n.get_script().resource_path.get_file() if n.get_script() else n.get_class()
 				kinds[k] = kinds.get(k, 0) + 1
 		print("BENCH items ", kinds)
+		for a in OS.get_cmdline_user_args():
+			if a.begins_with("--shot="):
+				get_viewport().get_texture().get_image().save_png(a.substr(7))
 		print("BENCH area %d off=%s: %.1f fps (scripts %.1f ms, %d draw calls a frame)" % [area, ",".join(off), frames / el, proc_ms / frames, draws / frames])
 		get_tree().quit()
 
