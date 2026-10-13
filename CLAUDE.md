@@ -66,7 +66,7 @@ Everything visual is generated from code; there are no hand-made image assets.
   names or assets. Since round 13 the theme is Magic: The Gathering: heroes are planeswalkers, monsters
   are MTG creatures, bosses and sub-bosses are MTG legends, skills may use MTG card names. The game will
   have five acts, one per colour; Act I is black (swamp). Wizards' Fan Content Policy needs written
-  permission for games, so Petr decides before anything goes live.
+  permission for games; Petr was told and on 2026-10-13 chose to publish it anyway as a free fan game.
 - Heroes (`Player.CLASSES`): Ajani (Barbarian stats), Chandra (Sorceress), Liliana (Necromancer).
   Skills are data in `scripts/skills.gd`, Diablo II style: 3 trees x 10 skills per hero on rows opening
   at levels 1/6/12/18/24/30, prerequisites, 1 skill point per level, up to 20 per skill, growth per point
