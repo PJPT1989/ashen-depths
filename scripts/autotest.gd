@@ -14,6 +14,9 @@ var fight_until := 0.0
 
 func _ready() -> void:
 	Game.save_settings = false
+	for f in DirAccess.get_files_at(main.saver.dir):
+		DirAccess.remove_absolute(main.saver.dir.path_join(f))
+	main.saver.refresh()
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--shots="):
 			shots_dir = a.substr(8)
@@ -144,9 +147,54 @@ func _ready() -> void:
 		main.revive()])
 	steps.append([1.0, func():
 		print("AUTOTEST revived in area %d, hp %d" % [main.area, main.player.hp])
+		_save_test()])
+	steps.append([1.0, func():
+		_check_restored()
+		main.state = "title"
+		main.hud.title_screen.visible = true])
+	steps.append([0.8, func():
+		_shot("title_saved")
 		print("AUTOTEST done")
 		get_tree().quit()])
 	wait = steps[0][0]
+
+
+var _before := ""
+
+
+## A save fingerprint: what must come back unchanged after saving and loading.
+func _fingerprint() -> String:
+	var p: Player = main.player
+	var names := []
+	for it in p.inv:
+		names.append("%s@%d,%d" % [it.name, it.gx, it.gy])
+	for s in Items.EQUIP_SLOTS:
+		names.append("%s=%s" % [s, p.equip[s].name if p.equip[s] else "-"])
+	var wps: Array = main.area_state.map(func(a): return 1 if a.waypoint else 0)
+	return "%s lvl %d xp %d gold %d str %d pts %d/%d skills %s keys %s wps %s items %s" % [p.cls, p.level, p.xp, p.gold, p.base.str,
+		p.stat_points, p.skill_points, p.skills, p.keys, wps, ",".join(PackedStringArray(names))]
+
+
+## Save the hero to a file, scramble him, load the file back and compare.
+func _save_test() -> void:
+	main.saver.save_now()
+	_before = _fingerprint()
+	var p: Player = main.player
+	var size := FileAccess.get_file_as_string(main.saver.dir.path_join("hero_%s.save" % p.cls)).length()
+	print("AUTOTEST save: %s, %d characters, error '%s'" % [main.saver.last_saved != "", size, main.saver.error])
+	p.set_class("chandra" if p.cls != "chandra" else "ajani")
+	p.gold = 0
+	p.inv.clear()
+	main.saver.refresh()
+	main.continue_game(main.saver.saves[_before.get_slice(" ", 0)].data)
+
+
+func _check_restored() -> void:
+	var after := _fingerprint()
+	print("AUTOTEST load: same %s, in area %d, saves %s" % [after == _before, main.area, main.saver.saves.keys()])
+	if after != _before:
+		print("AUTOTEST load before: " + _before)
+		print("AUTOTEST load after:  " + after)
 
 
 ## Kill the monsters nearest the hero so there are corpses for Liliana.

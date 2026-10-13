@@ -64,6 +64,10 @@ var tip_text: RichTextLabel
 var held_view: HeldView
 var automap: Automap
 var title_screen: Control
+var title_heroes: HBoxContainer
+var title_save: Button           # how saving works here; logs in when the shop has no login yet
+var save_lbl: Button             # in play: when the hero was last saved, or how to start saving
+var _replace := ""               # class whose "start a new hero" was clicked once
 var char_title: Label
 var dead_screen: Control
 
@@ -224,6 +228,15 @@ func setup(m) -> void:
 	held_view.hud = self
 	held_view.size = Vector2(1, 1)
 	root.add_child(held_view)
+	save_lbl = _button("", func(): main.saver.open_login())
+	save_lbl.flat = true
+	save_lbl.add_theme_font_size_override("font_size", 13)
+	save_lbl.add_theme_color_override("font_disabled_color", MUTED)
+	save_lbl.add_theme_color_override("font_color", GOLD)
+	save_lbl.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	save_lbl.position = Vector2(10, 6)
+	save_lbl.focus_mode = Control.FOCUS_NONE
+	root.add_child(save_lbl)
 	title_screen = _build_title()
 	dead_screen = _build_dead()
 	dead_screen.visible = false
@@ -952,12 +965,18 @@ func _build_title() -> Control:
 	var pick := _label("Choose your planeswalker", 26, GOLD, Game.font_display)
 	pick.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(pick)
-	var heroes := HBoxContainer.new()
-	heroes.alignment = BoxContainer.ALIGNMENT_CENTER
-	heroes.add_theme_constant_override("separation", 18)
-	v.add_child(heroes)
-	for c in Player.CLASS_ORDER:
-		heroes.add_child(_hero_card(c))
+	title_heroes = HBoxContainer.new()
+	title_heroes.alignment = BoxContainer.ALIGNMENT_CENTER
+	title_heroes.add_theme_constant_override("separation", 18)
+	v.add_child(title_heroes)
+	title_save = _button("", func(): main.saver.open_login())
+	title_save.flat = true
+	title_save.add_theme_font_size_override("font_size", 15)
+	var sc := CenterContainer.new()
+	sc.add_child(title_save)
+	v.add_child(sc)
+	_refresh_title()
+	main.saver.changed.connect(_refresh_title)
 	var q := _button("", func(): Game.set_quality((Game.quality + 1) % 3))
 	q.add_theme_font_size_override("font_size", 14)
 	q.add_theme_color_override("font_color", MUTED)
@@ -993,13 +1012,84 @@ func _build_dead() -> Control:
 	return o
 
 
+## The hero cards and the line about saving, again whenever the saves change.
+func _refresh_title() -> void:
+	if title_heroes == null:
+		return
+	for ch in title_heroes.get_children():
+		ch.queue_free()
+	for c in Player.CLASS_ORDER:
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 2)
+		col.add_child(_hero_card(c))
+		if main.saver.saves.has(c):
+			var again: bool = c == _replace
+			var nb := _button("Click again: the saved hero is lost" if again else "Start a new %s" % Player.CLASSES[c].name.split(" ")[0], func():
+				if _replace == c:
+					_replace = ""
+					main.saver.remove(c)
+					title_screen.visible = false
+					main.start_game(c)
+				else:
+					_replace = c
+					_refresh_title())
+			nb.flat = true
+			nb.add_theme_font_size_override("font_size", 13)
+			nb.add_theme_color_override("font_color", Color("e07a5a") if again else MUTED)
+			col.add_child(nb)
+		title_heroes.add_child(col)
+	var sv: SaveGame = main.saver
+	title_save.disabled = true
+	title_save.add_theme_color_override("font_color", MUTED)
+	title_save.add_theme_color_override("font_disabled_color", MUTED)
+	if sv.mode == SaveGame.LOCAL:
+		title_save.text = "Your heroes are saved on this computer as you play."
+	elif sv.mode == SaveGame.NONE:
+		title_save.text = "This copy of the game does not save. Play it on tomano-collection-shop.pages.dev to keep your heroes."
+	elif not sv.listed:
+		title_save.text = "Looking for your saved heroes..."
+	elif sv.signed_in:
+		title_save.text = "Your heroes are saved to your shop account (%s) as you play." % sv.email
+	else:
+		title_save.text = "Log in to your shop account to save your heroes (opens a new tab, then come back here)."
+		title_save.disabled = false
+		title_save.add_theme_color_override("font_color", GOLD)
+		title_save.add_theme_color_override("font_hover_color", Color("ffe2a0"))
+	_refresh_save_lbl()
+
+
+## The small line under the top edge in play: last save, a failed save or how to start saving.
+func _refresh_save_lbl() -> void:
+	if save_lbl == null:
+		return
+	var sv: SaveGame = main.saver
+	save_lbl.disabled = true
+	if sv.mode == SaveGame.NONE:
+		save_lbl.text = "Not saving"
+	elif sv.mode == SaveGame.SHOP and not sv.signed_in:
+		save_lbl.text = "Not saving: log in to your shop account"
+		save_lbl.disabled = false
+	elif sv.error != "":
+		save_lbl.text = "Not saved: %s" % sv.error
+	elif sv.last_saved != "":
+		save_lbl.text = "Saved %s" % sv.last_saved
+	else:
+		save_lbl.text = ""
+
+
 ## One planeswalker on the title screen: a picture from the baked sheet, name, role and
-## starting attributes. Clicking it starts the game as that hero.
+## starting attributes. Clicking it starts the game as that hero, or carries on with the
+## saved one.
 func _hero_card(c: String) -> Button:
 	var d: Dictionary = Player.CLASSES[c]
+	var saved: Dictionary = main.saver.saves.get(c, {})
 	var b := _button("", func():
 		title_screen.visible = false
-		main.start_game(c))
+		_replace = ""
+		if saved.is_empty():
+			main.start_game(c)
+		else:
+			main.continue_game(saved.data))
 	b.custom_minimum_size = Vector2(250, 262)
 	var n := _box(Color("1d0f0c"), Color("6b3a22"))
 	var h := _box(Color("3a160b"), Color("c8653a"))
@@ -1037,6 +1127,8 @@ func _hero_card(c: String) -> Button:
 	v.add_child(role)
 	var st: Dictionary = d.stats
 	var stats := _label("Str %d · Dex %d · Vit %d · Ene %d" % [st.str, st.dex, st.vit, st.ene], 13, MUTED)
+	if not saved.is_empty():
+		stats = _label("Continue · " + SaveGame.summary(saved.data), 14, GOLD, Game.font_bold)
 	stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(stats)
 	return b

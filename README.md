@@ -9,6 +9,18 @@ Magic: The Gathering and its characters belong to Wizards of the Coast.
 2. In the Project Manager choose **Import**, pick this folder's `project.godot`, then press **F5**.
 3. Pick a planeswalker on the title screen.
 
+## Saving
+Each planeswalker has one saved hero. The game saves by itself when you change area, level up, kill
+an area boss, and every minute of play. A saved hero continues from the title screen (the card says
+"Continue" with the level and the furthest area reached) and wakes in Mirewatch, like Diablo II; the
+act keeps its map layouts, waypoints, slain bosses, explored map and items left on the ground.
+"Start a new ..." under a card (clicked twice) throws the saved hero away.
+- Desktop: saves are files in Godot's user folder (`user://hero_<planeswalker>.save`).
+- Browser, on the shop's game page: saves go to the shop account of whoever is logged in there
+  (shop repo, `js/game-saves.js` and table `game_saves`). Without a login nothing is saved; the
+  title screen and the top-left corner offer the login in a new tab, and the next autosave picks it up.
+- Browser anywhere else: no saving.
+
 | Key | Action |
 | --- | --- |
 | Left click | Walk, talk, use waypoints and doorways, pick up (hold to keep walking). On a monster: your left-click skill |
@@ -136,6 +148,7 @@ each other, or heal you as you hit them; burns and rot deal damage over time.
 | `scripts/monster.gd` | The 15 monster kinds, ranks, uniques, bosses and AI |
 | `scripts/projectile.gd` | Hero and minion missiles; monster hexes, arrows, quills and bile |
 | `scripts/items.gd`, `item_art.gd` | Item bases, affixes, uniques and charms; the painted inventory pictures |
+| `scripts/save.gd` | Saved heroes: what a save holds, desktop files, the shop account in the browser, autosave |
 | `scripts/hud.gd`, `inv_view.gd`, `automap.gd`, `orb.gd` | Title and hero choice, bar, orbs, character, skills, inventory, trade and waypoint panels, map |
 | `scripts/game.gd` (autoload `Game`) | Isometric math, sprite sheets, rank colours, hit chance, input, sound, lights |
 | `shaders/rank.gdshader` | Recolours a monster by rank |

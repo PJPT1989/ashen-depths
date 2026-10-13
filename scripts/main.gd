@@ -63,6 +63,7 @@ var area_state: Array = []    # per area: visited, waypoint, killed {uid: true},
 var tp = null                 # the open town portal: {"area": i, "wpos": Vector2}
 var stock := {"vendor": [], "healer": []}
 var bosses_killed := 0
+var saver: SaveGame            # saved heroes (desktop file or the shop account)
 ## The browser build (or `-- --web` on desktop, to test it): starts at medium quality, uses the
 ## mipmap-free bloom at high, and drops to low by itself if the first seconds run slowly.
 var web := OS.has_feature("web") or "--web" in OS.get_cmdline_user_args()
@@ -76,6 +77,12 @@ func _ready() -> void:
 	move_child(flat, floor_fx.get_index() + 1)
 	_build_post()
 	_build_ambient()
+	saver = SaveGame.new()
+	saver.main = self
+	if "--autotest" in OS.get_cmdline_user_args() or "--bench" in OS.get_cmdline_user_args():
+		saver.dir = OS.get_cache_dir().path_join("innistrad-test-saves")
+		DirAccess.make_dir_recursive_absolute(saver.dir)
+	add_child(saver)
 	new_game()
 	hud.setup(self)
 	if "--autotest" in OS.get_cmdline_user_args():
@@ -214,6 +221,7 @@ func load_area(i: int, arrive: String) -> void:
 	hud.refresh()
 	if state == "play":
 		_announce()
+		saver.save_now()
 
 
 func _announce() -> void:
@@ -349,10 +357,17 @@ func spawn_monster(type: String, at: Vector2, rank: int, role := "normal") -> Mo
 	return m
 
 
+## Carry on with a saved hero (SaveGame.snapshot), waking in Mirewatch.
+func continue_game(d: Dictionary) -> void:
+	SaveGame.restore(self, d)
+	show_msg("Mirewatch", "Welcome back, %s." % Player.CLASSES[player.cls].name, 3.5)
+
+
 func start_game(cls: String = Game.hero_class) -> void:
 	Game.hero_class = cls
 	player.set_class(cls)
 	state = "play"
+	saver.save_now()
 	show_msg("Mirewatch", "Speak with Elder Maelis, then take the north gate into the Blackwater Fen.", 5.0)
 
 
@@ -627,6 +642,7 @@ func kill_monster(m: Monster) -> void:
 			show_msg("Act I complete", "%s is dead. The mire is free of her oil. Press T to go home." % m.display_name, 7.0)
 		else:
 			show_msg("%s falls" % m.display_name, "The way on to %s is open." % Act.area(area + 1).name, 3.5)
+		saver.save_now()
 
 
 func _add_drop(d: Dictionary, near: Vector2) -> void:
@@ -725,6 +741,7 @@ func _on_level_up(level: int) -> void:
 		extra = "\nA new row of skills has opened."
 	show_msg("Level %d" % level, "5 stat points (C) and a skill point (S) to spend.%s" % extra, 4.5)
 	hud.refresh()
+	saver.save_now()
 
 
 ## A dead monster now lies as a corpse; only the newest 60 are kept.

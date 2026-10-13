@@ -229,3 +229,19 @@ point rules and a synergy, and shows each tree.
 The game is now **Innistrad Horrors**: title screen, window and browser tab (`project.godot`), README,
 notes and the web upload files. Earlier history entries and the HTML prototype keep the old name
 Ashen Depths as a record. The repository itself is renamed on GitHub by Petr.
+
+
+## 16. Saving progress, with a shop login in the browser (2026-10-13)
+> ok, now I want to adjust the game in such a way, that If I want, the game is able to save the progress (we can condition that option by needing login)
+
+`scripts/save.gd`: one saved hero per planeswalker, saved automatically (area change, level up, area
+boss, every minute). A save is the hero (attributes, points, skills, keys, equipment, inventory, belt,
+gold) and the act (area seeds, waypoints, slain uniques and bosses, explored map, items on the ground),
+written with `var_to_str` so types survive; text naming objects or resources is refused. Loading wakes
+the hero in Mirewatch as in Diablo II. The desktop saves to files in `user://`. In the browser the
+game asks the page around it (`window.parent.tomanoGames`, shop repo `js/game-saves.js`), which stores
+saves in the shop's Supabase table `game_saves` under the logged-in customer (own rows only, 20 per
+customer); without a login it does not save, and the title screen and top-left corner open the
+shop's login in a new tab. The title cards say "Continue · Level N · furthest area"; "Start a new ..."
+(two clicks) replaces a saved hero. The smoke test saves, scrambles the hero, loads and compares.
+
