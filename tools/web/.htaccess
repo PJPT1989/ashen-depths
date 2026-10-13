@@ -1,4 +1,4 @@
-# Ashen Depths web build: make sure the browser gets the right file types.
+# Innistrad Horrors web build: make sure the browser gets the right file types.
 AddType application/wasm .wasm
 AddType application/octet-stream .pck
 <IfModule mod_deflate.c>

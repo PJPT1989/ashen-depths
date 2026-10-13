@@ -1,6 +1,6 @@
-# Ashen Depths: notes for Claude
+# Innistrad Horrors: notes for Claude
 
-Ashen Depths is a Diablo-style isometric action RPG themed on Magic: The Gathering (round 13) in **Godot 4.3** (GDScript, GL Compatibility
+Innistrad Horrors (called Ashen Depths until round 15) is a Diablo-style isometric action RPG themed on Magic: The Gathering (round 13) in **Godot 4.3** (GDScript, GL Compatibility
 renderer). It is Petr's project; he describes features in plain language and expects them built,
 tested and shown with screenshots. `README.md` is the player-facing guide (controls, areas, rules,
 file map) and must stay accurate when gameplay changes. `docs/HISTORY.md` has every request Petr

@@ -222,3 +222,10 @@ confuse (Delirium), lure (Lure of the Grave) and heal on hit (Vampiric Embrace).
 one point in Savage Swipe, Shock or Drain Life. The smoke test casts all 73 active skills, checks the
 point rules and a synergy, and shows each tree.
 
+
+## 15. New name: Innistrad Horrors (2026-10-13)
+> I want to rename the name of game, lets call it "Innistrad horrors", change the name everywhere
+
+The game is now **Innistrad Horrors**: title screen, window and browser tab (`project.godot`), README,
+notes and the web upload files. Earlier history entries and the HTML prototype keep the old name
+Ashen Depths as a record. The repository itself is renamed on GitHub by Petr.

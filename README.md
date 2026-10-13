@@ -1,4 +1,4 @@
-# Ashen Depths: Act I (Godot 4)
+# Innistrad Horrors: Act I (Godot 4)
 
 A Diablo-style isometric action RPG set in the world of Magic: The Gathering. Three planeswalkers fight
 through the black act, a swamp ruled by Sheoldred: a starting town and eight areas. Unofficial fan work;

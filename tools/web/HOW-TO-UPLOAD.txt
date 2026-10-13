@@ -1,9 +1,9 @@
-Ashen Depths - Act I, web version
+Innistrad Horrors - Act I, web version
 =================================
 
 1. Upload every file in this folder (including the hidden .htaccess) to one folder on your site,
-   for example  https://your-site.com/ashen-depths/
-2. Open  https://your-site.com/ashen-depths/index.html  in Chrome, Firefox or Edge.
+   for example  https://your-site.com/innistrad-horrors/
+2. Open  https://your-site.com/innistrad-horrors/index.html  in Chrome, Firefox or Edge.
    The first load downloads about 67 MB, so it takes a moment.
 
 Requirements: the site must use https. No special server headers are needed (this build runs
@@ -13,7 +13,7 @@ on nginx add  "application/wasm wasm;"  to mime.types.
 
 To show the game inside one of your own pages, paste:
 
-<iframe src="/ashen-depths/index.html" width="1280" height="800" style="border:0; max-width:100%;"
+<iframe src="/innistrad-horrors/index.html" width="1280" height="800" style="border:0; max-width:100%;"
         allow="autoplay; fullscreen" allowfullscreen></iframe>
 
 Opening index.html straight from your computer (double-click) will not work; browsers block it.

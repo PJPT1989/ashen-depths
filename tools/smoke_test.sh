@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Runs the in-game smoke test (scripts/autotest.gd) under a virtual display and saves
 # screenshots. Takes about 2 minutes with software rendering.
-#   tools/smoke_test.sh [shots_dir]      default: /tmp/ashen-shots
+#   tools/smoke_test.sh [shots_dir]      default: /tmp/innistrad-shots
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SHOTS="${1:-/tmp/ashen-shots}"
+SHOTS="${1:-/tmp/innistrad-shots}"
 GODOT="${GODOT:-$(command -v godot || echo "$HOME/.local/bin/godot")}"
 mkdir -p "$SHOTS"
 cmd=("$GODOT" --path "$ROOT" --rendering-driver opengl3 -- --autotest "--shots=$SHOTS")

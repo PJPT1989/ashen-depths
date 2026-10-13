@@ -922,7 +922,7 @@ func _build_title() -> Control:
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_theme_constant_override("separation", 10)
 	center.add_child(v)
-	var t := _label("Ashen Depths", 84, EMBER, Game.font_display)
+	var t := _label("Innistrad Horrors", 84, EMBER, Game.font_display)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	t.add_theme_color_override("font_shadow_color", Color("2a0c04"))
 	t.add_theme_constant_override("shadow_offset_y", 4)
