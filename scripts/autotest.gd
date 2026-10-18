@@ -126,6 +126,18 @@ func _ready() -> void:
 		steps.append([4.5, func():
 			_report(ai)
 			_shot("area%d_%s" % [ai, Act.area(ai).id])])
+	var left := {}
+	steps.append([0.3, func():
+		# leave the last area and come back: the same monsters, as hurt as they were, and the same loot
+		left.n = main.monsters.size()
+		left.hp = main.monsters.reduce(func(a, m): return a + m.hp, 0)
+		left.drops = main.drops.size()
+		main.load_area(0, "waypoint")])
+	steps.append([0.5, func():
+		main.load_area(Act.count() - 1, "back")
+		var hp: int = main.monsters.reduce(func(a, m): return a + m.hp, 0)
+		print("AUTOTEST return to area: monsters %d -> %d, life %d -> %d, drops %d -> %d, boss %s" % [left.n, main.monsters.size(),
+			left.hp, hp, left.drops, main.drops.size(), main.boss != null])])
 	steps.append([0.3, func():
 		var b: Monster = main.boss
 		main.player.wpos = main.dungeon.boss_spot + Vector2(1.5, 1.5)
@@ -192,6 +204,8 @@ func _save_test() -> void:
 func _check_restored() -> void:
 	var after := _fingerprint()
 	print("AUTOTEST load: same %s, in area %d, saves %s" % [after == _before, main.area, main.saver.saves.keys()])
+	var fresh: bool = main.area_state.all(func(a): return a.monsters == null and a.drops.is_empty() and a.killed.is_empty())
+	print("AUTOTEST load is a new game: areas fresh %s, last boss way open %s" % [fresh, main.area_state[Act.count() - 1].opened])
 	if after != _before:
 		print("AUTOTEST load before: " + _before)
 		print("AUTOTEST load after:  " + after)

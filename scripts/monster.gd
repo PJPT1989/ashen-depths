@@ -80,7 +80,8 @@ var dot_color := Color.WHITE
 var corpse_t := 0.0         # after death: how long the body lies (Liliana raises and bursts them)
 
 
-func setup(t: String, at: Vector2, r: int, as_role := "normal") -> void:
+## keep_mods: the mods it had before (a monster put back when the hero returns), else rolled.
+func setup(t: String, at: Vector2, r: int, as_role := "normal", keep_mods = null) -> void:
 	kind = t
 	d = TYPES[t]
 	rank = clampi(r, 1, 12)
@@ -103,11 +104,11 @@ func setup(t: String, at: Vector2, r: int, as_role := "normal") -> void:
 		draw_scale = 1.12
 		var pool := MODS.keys()
 		pool.shuffle()
-		mods = pool.slice(0, 1 if randf() < 0.5 else 2)
+		mods = pool.slice(0, 1 if randf() < 0.5 else 2) if keep_mods == null else keep_mods
 	elif is_boss:
 		hpm *= 2.6; dmm *= 1.2; xpm *= 12.0
 		draw_scale = 1.3
-		mods = [["strong", "fast", "stone", "fire", "cold"].pick_random()]
+		mods = [["strong", "fast", "stone", "fire", "cold"].pick_random()] if keep_mods == null else keep_mods
 	if "strong" in mods:
 		dmm *= 1.5
 	if "fast" in mods:

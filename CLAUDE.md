@@ -109,6 +109,8 @@ Everything visual is generated from code; there are no hand-made image assets.
 
 ## Known gaps and ideas Petr was offered
 - Difficulty has only been tuned by the automated test, not by hand; the act boss has 1,864 life.
+- Within a game an area keeps its living monsters and ground loot (`area_state`); a saved hero
+  continues as a new game (`Main.reset_act`), like Diablo II (round 17).
 - Saves (round 16): one hero per planeswalker. A new field worth keeping goes in `SaveGame.snapshot`
   and `restore`; bump `SaveGame.VERSION` only with a conversion for old saves, or players lose heroes.
 - No Acts II-V, no quests, no skill respec. Skill numbers are untuned beyond the smoke test.

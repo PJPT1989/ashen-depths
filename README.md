@@ -10,10 +10,13 @@ Magic: The Gathering and its characters belong to Wizards of the Coast.
 3. Pick a planeswalker on the title screen.
 
 ## Saving
-Each planeswalker has one saved hero. The game saves by itself when you change area, level up, kill
-an area boss, and every minute of play. A saved hero continues from the title screen (the card says
-"Continue" with the level and the furthest area reached) and wakes in Mirewatch, like Diablo II; the
-act keeps its map layouts, waypoints, slain bosses, explored map and items left on the ground.
+Within one game an area stays as you left it: go to town and come back, and the monsters you didn't
+kill are still there, as hurt as they were, with your loot still on the ground. Each planeswalker has
+one saved hero. The game saves by itself when you change area, level up, kill an area boss, and every
+minute of play. A saved hero continues from the title screen (the card says "Continue" with the level
+and the furthest area reached) as a new game, like Diablo II: new area layouts, all monsters back,
+nothing on the ground, and the hero wakes in Mirewatch. Waypoints stay found, and an area whose boss
+you once killed keeps its way on open even though the boss is back.
 "Start a new ..." under a card (clicked twice) throws the saved hero away.
 - Desktop: saves are files in Godot's user folder (`user://hero_<planeswalker>.save`).
 - Browser, on the shop's game page: saves go to the shop account of whoever is logged in there

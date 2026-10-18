@@ -245,3 +245,15 @@ customer); without a login it does not save, and the title screen and top-left c
 shop's login in a new tab. The title cards say "Continue · Level N · furthest area"; "Start a new ..."
 (two clicks) replaces a saved hero. The smoke test saves, scrambles the hero, loads and compares.
 
+
+## 17. Areas stay as you left them within a game (2026-10-18)
+> There is a "bug", that when i leave area and return to it. Monsters are respawn. I want it i a way that leaving area within one "run" doesnt restart the respawn. It stays the same way as before leaving. Different case is when i turn game off and return to hero after some time. Then it should restart the swap( also items laying on ground should disappear). Basically same way it works in diablo
+
+Leaving an area now files its living monsters (kind, position, rank, role, life, mods, name, pack
+leader) in `area_state[i].monsters`; coming back puts exactly those back (`Main._repopulate`)
+instead of rolling a new population. Loot on the ground was already kept. Continuing a saved hero
+is a new game (`Main.reset_act`): new area seeds, monsters, uniques and bosses back, the floor
+empty, explored maps forgotten. Saves now keep only waypoints, visited areas and `opened` (an area
+boss died in some game, so its exit is no longer sealed although the boss returns). Older saves load
+too. The smoke test leaves the last area and returns (same monsters, same total life).
+

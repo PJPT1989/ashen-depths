@@ -4,8 +4,9 @@ extends Node
 ## they belong to the shop account logged in on the page around the game: the page offers
 ## window.tomanoGames (shop repo js/game-saves.js), which keeps them in its database. Without a
 ## login, or outside the shop, the browser game does not save.
-## A save is the hero (stats, skills, items, gold) and the act (area seeds, waypoints, slain
-## bosses, explored map). Loading wakes the hero in Mirewatch, like Diablo II.
+## A save is the hero (stats, skills, items, gold) and what he opened in the act (waypoints, ways
+## past slain area bosses). Loading starts a new game, like Diablo II: fresh area layouts, monsters
+## back, nothing left on the ground, and the hero wakes in Mirewatch.
 
 signal changed   # the list of saves or the login state changed
 
@@ -169,18 +170,16 @@ static func snapshot(m) -> Dictionary:
 	var inv: Array = p.inv.duplicate(true)
 	if p.held != null:
 		inv.append(p.held.duplicate(true))   # put back in the bag on load
+	# only what outlasts a game: waypoints and opened ways (like Diablo II, a new game has fresh maps,
+	# monsters and an empty floor)
 	var areas: Array = []
-	for i in m.area_state.size():
-		var s: Dictionary = m.area_state[i]
-		var seen: PackedByteArray = m.dungeon.seen if i == m.area else s.seen
-		var drops: Array = m.drops if i == m.area else s.drops
-		areas.append({"visited": s.visited, "waypoint": s.waypoint, "killed": s.killed.duplicate(),
-			"seen": seen.compress(FileAccess.COMPRESSION_DEFLATE), "seen_size": seen.size(), "drops": drops.duplicate(true)})
+	for s in m.area_state:
+		areas.append({"visited": s.visited, "waypoint": s.waypoint, "opened": s.opened})
 	return {"v": VERSION, "cls": p.cls, "level": p.level, "xp": p.xp, "gold": p.gold, "base": p.base.duplicate(),
 		"stat_points": p.stat_points, "skill_points": p.skill_points, "skills": p.skills.duplicate(),
 		"bar": p.bar.duplicate(), "keys": p.keys.duplicate(), "equip": p.equip.duplicate(true), "inv": inv,
 		"belt": p.belt.duplicate(), "hp": p.hp, "mp": p.mp, "area": m.area, "bosses_killed": m.bosses_killed,
-		"area_seeds": m.area_seeds.duplicate(), "areas": areas}
+		"areas": areas}
 
 
 ## Put a snapshot back: the hero, then the act, then wake in town.
@@ -211,12 +210,14 @@ static func restore(m, d: Dictionary) -> void:
 	p.hp = clampf(d.hp, 1.0, p.st.max_hp)
 	p.mp = clampf(d.mp, 0.0, p.st.max_mp)
 	m.bosses_killed = d.bosses_killed
-	if d.area_seeds.size() == Act.count() and d.areas.size() == Act.count():
-		m.area_seeds = d.area_seeds
-		m.area_state.clear()
-		for s in d.areas:
-			var seen: PackedByteArray = s.seen.decompress(s.seen_size, FileAccess.COMPRESSION_DEFLATE) if s.seen_size > 0 else PackedByteArray()
-			m.area_state.append({"visited": s.visited, "waypoint": s.waypoint, "killed": s.killed, "seen": seen, "drops": s.drops})
+	m.reset_act()
+	if d.areas.size() == Act.count():
+		for i in d.areas.size():
+			var a: Dictionary = d.areas[i]
+			m.area_state[i].visited = a.visited
+			m.area_state[i].waypoint = a.waypoint or i == 0
+			# saves from before "opened" kept the list of slain bosses instead
+			m.area_state[i].opened = a.get("opened", a.has("killed") and a.killed.has("boss"))
 	m.dungeon.seen = PackedByteArray()   # so load_area doesn't file the old town over the restored one
 	m.state = "play"
 	m.load_area(0, "waypoint")
@@ -235,7 +236,7 @@ static func decode(text: String):
 	var d = str_to_var(text)
 	if not d is Dictionary or d.get("v", 0) != VERSION or not d.get("cls", "") in Player.CLASS_ORDER:
 		return null
-	for k in ["level", "xp", "gold", "base", "skills", "bar", "keys", "equip", "inv", "belt", "area_seeds", "areas"]:
+	for k in ["level", "xp", "gold", "base", "skills", "bar", "keys", "equip", "inv", "belt", "areas"]:
 		if not d.has(k):
 			return null
 	return d

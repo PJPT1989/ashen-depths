@@ -59,7 +59,7 @@ var fps_check := [0.0, 0]     # first seconds of play in the browser: [time, fra
 var flat: Node2D          # flat things on the ground (waypoints, stairs down), under the world
 
 var area_seeds: Array = []
-var area_state: Array = []    # per area: visited, waypoint, killed {uid: true}, seen, drops
+var area_state: Array = []    # per area this game: visited, waypoint, opened, killed {uid: true}, seen, drops, monsters
 var tp = null                 # the open town portal: {"area": i, "wpos": Vector2}
 var stock := {"vendor": [], "healer": []}
 var bosses_killed := 0
@@ -101,12 +101,7 @@ func new_game() -> void:
 	for mi in minions:
 		mi.queue_free()
 	minions.clear()
-	area_seeds.clear()
-	area_state.clear()
-	for i in Act.count():
-		area_seeds.append(randi())
-		area_state.append({"visited": false, "waypoint": i == 0, "killed": {}, "seen": PackedByteArray(), "drops": []})
-	tp = null
+	reset_act()
 	bosses_killed = 0
 	player = PlayerScene.instantiate()
 	player.main = self
@@ -122,6 +117,19 @@ func new_game() -> void:
 	load_area(0, "start")
 
 
+## A new game of the act: new layouts, every area unvisited and full of monsters, no town portal.
+## monsters stays null until the hero first enters; then it holds the living ones he left behind.
+## opened: the area boss died in some game, so the way on stays open even though he is back.
+func reset_act() -> void:
+	area_seeds.clear()
+	area_state.clear()
+	for i in Act.count():
+		area_seeds.append(randi())
+		area_state.append({"visited": false, "waypoint": i == 0, "opened": false, "killed": {}, "seen": PackedByteArray(),
+			"drops": [], "monsters": null})
+	tp = null
+
+
 func in_town() -> bool:
 	return area == 0
 
@@ -133,6 +141,36 @@ func _save_area() -> void:
 		return
 	area_state[area].seen = dungeon.seen.duplicate()
 	area_state[area].drops = drops.duplicate()
+	if not in_town():
+		area_state[area].monsters = _monster_records()
+
+
+## The living monsters of this area as data, to put back when the hero returns.
+func _monster_records() -> Array:
+	var alive: Array = monsters.filter(func(m): return not m.dead)
+	var list: Array = []
+	for m in alive:
+		var lead: int = alive.find(m.leader) if is_instance_valid(m.leader) else -1
+		list.append({"kind": m.kind, "wpos": m.wpos, "rank": m.rank, "role": m.role, "hp": m.hp, "uid": m.uid,
+			"mods": m.mods.duplicate(), "name": m.display_name, "leader": lead})
+	return list
+
+
+## Put back the monsters the hero left here, hurt as they were.
+func _repopulate(list: Array) -> void:
+	var made: Array = []
+	for r in list:
+		var m := spawn_monster(r.kind, r.wpos, r.rank, r.role, r.mods)
+		m.hp = mini(r.hp, m.max_hp)
+		m.uid = r.uid
+		m.display_name = r.name
+		if m.is_boss:
+			boss = m
+		made.append(m)
+	for i in list.size():
+		var li: int = list[i].leader
+		if li >= 0 and li < list.size():
+			made[i].leader = made[li]
 
 
 ## Build area i and put the hero in it. arrive: start (from the previous area), back (from
@@ -181,7 +219,10 @@ func load_area(i: int, arrive: String) -> void:
 	_place_objects()
 	if not in_town():
 		_place_braziers()
-		_populate()
+		if stt.monsters == null:
+			_populate()
+		else:
+			_repopulate(stt.monsters)
 	else:
 		_restock()
 	var keep := ["townsfolk"]
@@ -252,7 +293,7 @@ func _place_objects() -> void:
 	if area < Act.count() - 1:
 		var e := Interactable.new()
 		e.setup_portal(dungeon.exit, dungeon.exit_style, area + 1, true)
-		e.sealed = not in_town() and not stt.killed.has("boss")
+		e.sealed = not in_town() and not stt.killed.has("boss") and not stt.opened
 		exit_portal = _add_object(e)
 	if area > 0:
 		var b := Interactable.new()
@@ -344,14 +385,14 @@ func _populate() -> void:
 			mm.leader = boss
 
 
-func spawn_monster(type: String, at: Vector2, rank: int, role := "normal") -> Monster:
+func spawn_monster(type: String, at: Vector2, rank: int, role := "normal", mods = null) -> Monster:
 	var m: Monster = MonsterScene.instantiate()
 	m.main = self
 	m.dungeon = dungeon
 	var r: float = Monster.TYPES[type].r
 	if not dungeon.is_free(at, r):
 		at = dungeon.spot_near(at, 1.5, r)
-	m.setup(type, at, rank, role)
+	m.setup(type, at, rank, role, mods)
 	world.add_child(m)
 	monsters.append(m)
 	return m
@@ -632,6 +673,8 @@ func kill_monster(m: Monster) -> void:
 	_drop_loot(m)
 	if m.uid != "":
 		area_state[area].killed[m.uid] = true
+		if m.uid == "boss":
+			area_state[area].opened = true
 	if m == boss:
 		boss = null
 		bosses_killed = maxi(bosses_killed, area)
