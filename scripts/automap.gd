@@ -48,7 +48,7 @@ func _draw() -> void:
 	var sc := clampf(minf(vs.x, vs.y) / 2400.0, 0.1, 0.3)
 	var hw := Game.HW * sc
 	var hh := Game.HH * sc
-	var center := Vector2(vs.x / 2.0, vs.y * 0.42)
+	var center: Vector2 = main.player.get_global_transform_with_canvas().origin   # the map's hero mark sits on the hero
 	var o := center - Vector2((p.x - p.y) * hw, (p.x + p.y) * hh)
 	draw_rect(Rect2(Vector2.ZERO, vs), Color(0, 0, 0, 0.45))
 	draw_set_transform(o, 0.0, Vector2(hw, hh))
@@ -72,7 +72,8 @@ func _draw() -> void:
 				draw_circle(c, 5, Color("8ec8ff"))
 			"npc":
 				draw_circle(c, 3.5, Color("e8dcc0"))
-	draw_circle(center, 3.5, Color("e8e0c8"))
+	draw_circle(center, 5.0, Color(0, 0, 0, 0.6))
+	draw_circle(center, 3.5, Color("ffe9b0"))
 	var a := Act.area(main.area)
 	var f: Font = Game.font_display
 	draw_string(f, Vector2(24, 48), a.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 30, Color("c8a165"))

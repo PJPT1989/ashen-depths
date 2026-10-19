@@ -112,7 +112,14 @@ func _ready() -> void:
 		[0.3, func():
 			main.hud.close_panels()
 			main.hud.toggle_map()],
-		[0.8, func(): _shot("map")],
+		[0.8, func():
+			_shot("map")
+			map_from = main.player.wpos
+			map_edges = main.hud.automap._lines.size() / 2
+			main.player.command_move(main.dungeon.nearest_floor(main.player.wpos + Vector2(6, -4)))],
+		[2.5, func():
+			print("AUTOTEST map open while walking: hero %s -> %s, map outline %d -> %d edges" % [map_from, main.player.wpos, map_edges, main.hud.automap._lines.size() / 2])
+			_shot("map_walked")],
 		[0.3, func():
 			main.hud.toggle_map()
 			main.open_town_portal()],
@@ -172,6 +179,8 @@ func _ready() -> void:
 
 
 var _before := ""
+var map_from := Vector2.ZERO
+var map_edges := 0
 
 
 ## A save fingerprint: what must come back unchanged after saving and loading.

@@ -225,6 +225,8 @@ func mark_seen(p: Vector2, radius := 9) -> void:
 				var w = blockers.get(Vector2i(i, j))
 				if w:
 					w.visible = true
+	if not dirty.is_empty():
+		seen_version += 1
 	if not outdoor:
 		for ck in dirty:
 			if _chunks.has(ck):

@@ -257,3 +257,12 @@ empty, explored maps forgotten. Saves now keep only waypoints, visited areas and
 boss died in some game, so its exit is no longer sealed although the boss returns). Older saves load
 too. The smoke test leaves the last area and returns (same monsters, same total life).
 
+
+## 18. The Tab map follows the hero again (2026-10-19)
+> can we fix "tab" mini map? it seems to be broken in a way that it doesnt move along the characted
+
+`Dungeon.mark_seen` had stopped bumping `seen_version`, so the automap built its outline once and
+never added ground explored after that. It bumps again whenever new tiles are revealed, and the
+map's hero mark now sits on the hero's sprite instead of a fixed point above it. The smoke test
+walks with the map open and checks the outline grows.
+
